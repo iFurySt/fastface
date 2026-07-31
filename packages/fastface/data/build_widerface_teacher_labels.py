@@ -96,6 +96,7 @@ def convert(
     input_size: int,
     match_iou: float,
     max_images: int | None,
+    drop_unmatched: bool,
 ) -> dict[str, int]:
     detector = build_detector(
         model_name=model_name,
@@ -135,6 +136,9 @@ def convert(
                     if overlaps[box_index, teacher_index] >= match_iou:
                         points = [(float(px), float(py)) for px, py in teacher_landmarks[teacher_index]]
                         point_source = "teacher"
+                if point_source != "teacher" and drop_unmatched:
+                    stats["fallback_faces"] += 1
+                    continue
                 row = [float(x), float(y), float(width), float(height)]
                 for point_x, point_y in points:
                     row.extend([point_x, point_y, 0.0])
@@ -158,6 +162,7 @@ def main() -> None:
     parser.add_argument("--teacher-input-size", type=int, default=640)
     parser.add_argument("--match-iou", type=float, default=0.5)
     parser.add_argument("--max-images", type=int)
+    parser.add_argument("--drop-unmatched", action="store_true", help="Drop GT boxes that do not match a teacher detection.")
     args = parser.parse_args()
 
     stats = convert(
@@ -170,6 +175,7 @@ def main() -> None:
         input_size=args.teacher_input_size,
         match_iou=args.match_iou,
         max_images=args.max_images,
+        drop_unmatched=args.drop_unmatched,
     )
     print(stats)
 
