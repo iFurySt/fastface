@@ -207,15 +207,13 @@ class OwnedRetinaFaceOnnxDetector:
         self.pre_nms_topk = pre_nms_topk
         self.post_nms_topk = post_nms_topk
         self.input_size = input_size
+        self._prior_cache: dict[tuple[int, int], np.ndarray] = {}
         self.name = f"owned-retinaface-onnx:{network}:{model_path.name}"
 
         sys.path.insert(0, str(repo_path))
         from config import get_config
-        from layers import PriorBox
-        from utils.box_utils import decode, nms
+        from utils.box_utils import nms
 
-        self.PriorBox = PriorBox
-        self.decode = decode
         self.nms = nms
         self.cfg = get_config(network)
         if self.cfg is None:
@@ -238,12 +236,12 @@ class OwnedRetinaFaceOnnxDetector:
         image -= (104, 117, 123)
         image = image.transpose(2, 0, 1)[np.newaxis].astype(np.float32)
         outputs = self.session.run(self.output_names, {self.input_name: image})
-        loc = torch.from_numpy(np.asarray(outputs[0]).squeeze(0))
+        loc = np.asarray(outputs[0], dtype=np.float32).squeeze(0)
         conf = np.asarray(outputs[1]).squeeze(0)
-        priors = self.PriorBox(self.cfg, image_size=(height, width)).generate_anchors()
-        boxes = self.decode(loc, priors, self.cfg["variance"])
-        bbox_scale = torch.tensor([width, height] * 2)
-        boxes = (boxes * bbox_scale / resize_factor).numpy()
+        priors = self._get_priors(height=height, width=width)
+        boxes = decode_retinaface_boxes(loc, priors, self.cfg["variance"])
+        bbox_scale = np.asarray([width, height] * 2, dtype=np.float32)
+        boxes = boxes * bbox_scale / resize_factor
         boxes[:, 0::2] = np.clip(boxes[:, 0::2], 0, original_width)
         boxes[:, 1::2] = np.clip(boxes[:, 1::2], 0, original_height)
         scores = conf[:, 1]
@@ -258,6 +256,14 @@ class OwnedRetinaFaceOnnxDetector:
         detections = detections[keep][: self.post_nms_topk]
         return detections[:, :4].astype(np.float32)
 
+    def _get_priors(self, height: int, width: int) -> np.ndarray:
+        key = (height, width)
+        priors = self._prior_cache.get(key)
+        if priors is None:
+            priors = generate_retinaface_priors(self.cfg, height=height, width=width)
+            self._prior_cache[key] = priors
+        return priors
+
 
 def resize_image_to_square(image_bgr: np.ndarray, input_size: int) -> tuple[np.ndarray, float]:
     height, width = image_bgr.shape[:2]
@@ -270,6 +276,37 @@ def resize_image_to_square(image_bgr: np.ndarray, input_size: int) -> tuple[np.n
     canvas = np.zeros((input_size, input_size, 3), dtype=image_bgr.dtype)
     canvas[: resized.shape[0], : resized.shape[1]] = resized
     return canvas, resize_factor
+
+
+def generate_retinaface_priors(cfg: dict, height: int, width: int) -> np.ndarray:
+    anchors: list[float] = []
+    for min_sizes, step in zip(cfg["min_sizes"], cfg["steps"]):
+        feature_height = int(np.ceil(height / step))
+        feature_width = int(np.ceil(width / step))
+        for row in range(feature_height):
+            for col in range(feature_width):
+                for min_size in min_sizes:
+                    anchors.extend(
+                        [
+                            (col + 0.5) * step / width,
+                            (row + 0.5) * step / height,
+                            min_size / width,
+                            min_size / height,
+                        ]
+                    )
+    priors = np.asarray(anchors, dtype=np.float32).reshape(-1, 4)
+    if cfg.get("clip", False):
+        np.clip(priors, 0.0, 1.0, out=priors)
+    return priors
+
+
+def decode_retinaface_boxes(loc: np.ndarray, priors: np.ndarray, variances: list[float]) -> np.ndarray:
+    centers = priors[:, :2] + loc[:, :2] * variances[0] * priors[:, 2:]
+    sizes = priors[:, 2:] * np.exp(loc[:, 2:] * variances[1])
+    boxes = np.empty_like(loc, dtype=np.float32)
+    boxes[:, :2] = centers - sizes / 2
+    boxes[:, 2:] = centers + sizes / 2
+    return boxes
 
 
 def evaluate_detector(
