@@ -112,8 +112,23 @@ bash scripts/predict-image.sh \
   --detector-model scrfd_10g
 ```
 
-The UniFace backend is a baseline dependency, not the final owned detector.
-Install it with:
+Run with the owned ONNX detector:
+
+```sh
+bash scripts/predict-image.sh \
+  --image input.jpg \
+  --model models/fastface-large-128/model_fp32.onnx \
+  --detector owned-retinaface-onnx \
+  --owned-detector-onnx models/fastfacedetector/fastfacedetector.onnx \
+  --detector-input-size 1280 \
+  --detector-resize-mode max-side \
+  --detector-conf 0.55 \
+  --detector-nms 0.3 \
+  --detector-pre-nms-topk 1000
+```
+
+The UniFace backends are baseline dependencies, not the final owned detector.
+Install the pipeline dependencies with:
 
 ```sh
 python -m pip install ".[pipeline]"

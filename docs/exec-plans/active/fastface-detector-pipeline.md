@@ -253,3 +253,31 @@ Validation notes:
   `0.87950`, recall `0.40421`, and F1 `0.55391`; confidence `0.75` reached
   precision `0.94315`, recall `0.33970`, and F1 `0.49949`. Consequence: this
   route is useful as a precision ceiling but is not the final detector route.
+- 2026-07-31: Profiling the owned ONNX detector showed that the latency gap was
+  mostly preprocessing and per-image prior generation, not NMS. The benchmark
+  harness now uses `cv2.dnn.blobFromImage` for numerically equivalent BGR mean
+  subtraction and vectorized NumPy prior generation. Evidence on full WIDER FACE
+  validation with max-side 1280, confidence `0.55`, NMS `0.3`, and pre-NMS topK
+  `1000`: owned ONNX reached precision `0.89052`, recall `0.45003`, F1
+  `0.59790`, and `0.02038` seconds/image; UniFace RetinaFace MNetV2 reached
+  precision `0.87753`, recall `0.44552`, F1 `0.59099`, and `0.02699`
+  seconds/image. Consequence: the current owned detector now beats the UniFace
+  RetinaFace MNetV2 bbox/latency target, while the remaining finalization gate
+  is landmark/alignment quality.
+- 2026-07-31: Added the owned ONNX detector backend to the full-image pipeline
+  CLI and verified end-to-end no-face and face-image behavior. A WIDER FACE
+  sample returned three faces with `crop_mode: "landmark_5pt"` through the owned
+  detector + FastFace ONNX path, and a generated plain image returned
+  `status: "no_face"`.
+- 2026-07-31: Added an alignment benchmark comparing candidate detector
+  landmarks and aligned FastFace outputs against UniFace RetinaFace MNetV2. The
+  bootstrap detector that wins bbox/latency has weak alignment evidence on
+  val50: mean normalized landmark error `0.14682`, mean aligned-crop MAE
+  `0.14374`, mean FastFace age difference `6.13455`, and gender agreement
+  `0.83045`. Teacher-landmark candidates improve alignment but miss another
+  target: whole-image 960 reached mean normalized landmark error `0.09170` and
+  aligned-crop MAE `0.09000`, but val100 precision was only `0.7792` at its best
+  F1 point; clean fine-tune reached stronger precision and alignment
+  (`0.08380` landmark error, `0.08510` crop MAE) but recall/F1 were too low.
+  Consequence: the detector is not final until the whole-image recall/F1 and
+  teacher-landmark alignment gains are combined without losing precision.

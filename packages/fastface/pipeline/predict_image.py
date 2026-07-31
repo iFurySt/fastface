@@ -19,9 +19,9 @@ def main() -> None:
     parser.add_argument("--model", type=Path, required=True, help="FastFace ONNX model path.")
     parser.add_argument(
         "--detector",
-        choices=["retinaface", "scrfd"],
+        choices=["retinaface", "scrfd", "owned-retinaface-onnx"],
         default="retinaface",
-        help="Detector backend. Current backends use UniFace as the baseline implementation.",
+        help="Detector backend. RetinaFace and SCRFD use UniFace baseline implementations.",
     )
     parser.add_argument(
         "--detector-model",
@@ -31,8 +31,13 @@ def main() -> None:
         ),
     )
     parser.add_argument("--detector-input-size", type=int, default=640)
+    parser.add_argument("--detector-resize-mode", choices=["square", "max-side"], default="square")
     parser.add_argument("--detector-conf", type=float, default=0.5)
     parser.add_argument("--detector-nms", type=float, default=0.4)
+    parser.add_argument("--detector-pre-nms-topk", type=int, default=1000)
+    parser.add_argument("--detector-post-nms-topk", type=int, default=750)
+    parser.add_argument("--owned-detector-onnx", type=Path, help="Owned RetinaFace ONNX detector path.")
+    parser.add_argument("--owned-detector-network", default="mobilenetv1_0.50")
     parser.add_argument("--providers", default="CPUExecutionProvider", help="Comma-separated ONNX Runtime providers for detector.")
     parser.add_argument("--input-size", type=int, help="Override FastFace input size. Defaults to ONNX metadata.")
     parser.add_argument("--max-faces", type=int, default=0, help="Maximum faces to return. Use 0 for all faces.")
@@ -56,6 +61,11 @@ def main() -> None:
         nms_threshold=args.detector_nms,
         input_size=args.detector_input_size,
         providers=parse_providers(args.providers),
+        owned_onnx_path=str(args.owned_detector_onnx) if args.owned_detector_onnx is not None else None,
+        owned_network=args.owned_detector_network,
+        resize_mode=args.detector_resize_mode,
+        pre_nms_topk=args.detector_pre_nms_topk,
+        post_nms_topk=args.detector_post_nms_topk,
     )
     predictor = FastFaceOnnxPredictor(
         model_path=args.model,

@@ -224,6 +224,16 @@ class OwnedRetinaFaceOnnxDetector:
         self.input_size = input_size
         self.resize_mode = resize_mode
         self._prior_cache: dict[tuple[int, int], np.ndarray] = {}
+        self._profile_seconds: dict[str, float] = {
+            "resize": 0.0,
+            "preprocess": 0.0,
+            "onnxruntime": 0.0,
+            "prior": 0.0,
+            "decode": 0.0,
+            "filter_sort": 0.0,
+            "nms": 0.0,
+        }
+        self._profile_images = 0
         self.name = f"owned-retinaface-onnx:{network}:{model_path.name}"
 
         sys.path.insert(0, str(repo_path))
@@ -242,6 +252,7 @@ class OwnedRetinaFaceOnnxDetector:
 
     def detect(self, image_bgr: np.ndarray) -> np.ndarray:
         original_height, original_width = image_bgr.shape[:2]
+        stage_start = time.perf_counter()
         if self.input_size is not None and self.input_size > 0:
             if self.resize_mode == "square":
                 image, resize_factor = resize_image_to_square(image_bgr, self.input_size)
@@ -252,20 +263,35 @@ class OwnedRetinaFaceOnnxDetector:
         else:
             image = image_bgr
             resize_factor = 1.0
+        self._profile_seconds["resize"] += time.perf_counter() - stage_start
         height, width = image.shape[:2]
-        image = np.float32(image)
-        image -= (104, 117, 123)
-        image = image.transpose(2, 0, 1)[np.newaxis].astype(np.float32)
+        stage_start = time.perf_counter()
+        image = cv2.dnn.blobFromImage(
+            image,
+            scalefactor=1.0,
+            size=(0, 0),
+            mean=(104, 117, 123),
+            swapRB=False,
+            crop=False,
+        )
+        self._profile_seconds["preprocess"] += time.perf_counter() - stage_start
+        stage_start = time.perf_counter()
         outputs = self.session.run(self.output_names, {self.input_name: image})
+        self._profile_seconds["onnxruntime"] += time.perf_counter() - stage_start
+        stage_start = time.perf_counter()
         loc = np.asarray(outputs[0], dtype=np.float32).squeeze(0)
         conf = np.asarray(outputs[1]).squeeze(0)
         priors = self._get_priors(height=height, width=width)
+        self._profile_seconds["prior"] += time.perf_counter() - stage_start
+        stage_start = time.perf_counter()
         boxes = decode_retinaface_boxes(loc, priors, self.cfg["variance"])
         bbox_scale = np.asarray([width, height] * 2, dtype=np.float32)
         boxes = boxes * bbox_scale / resize_factor
         boxes[:, 0::2] = np.clip(boxes[:, 0::2], 0, original_width)
         boxes[:, 1::2] = np.clip(boxes[:, 1::2], 0, original_height)
         scores = conf[:, 1]
+        self._profile_seconds["decode"] += time.perf_counter() - stage_start
+        stage_start = time.perf_counter()
         inds = scores > self.confidence_threshold
         boxes = boxes[inds]
         scores = scores[inds]
@@ -273,8 +299,12 @@ class OwnedRetinaFaceOnnxDetector:
         boxes = boxes[order]
         scores = scores[order]
         detections = np.hstack((boxes, scores[:, np.newaxis])).astype(np.float32, copy=False)
+        self._profile_seconds["filter_sort"] += time.perf_counter() - stage_start
+        stage_start = time.perf_counter()
         keep = self.nms(detections, self.nms_threshold)
         detections = detections[keep][: self.post_nms_topk]
+        self._profile_seconds["nms"] += time.perf_counter() - stage_start
+        self._profile_images += 1
         return detections[:, :5].astype(np.float32)
 
     def _get_priors(self, height: int, width: int) -> np.ndarray:
@@ -284,6 +314,16 @@ class OwnedRetinaFaceOnnxDetector:
             priors = generate_retinaface_priors(self.cfg, height=height, width=width)
             self._prior_cache[key] = priors
         return priors
+
+    def profile_summary(self) -> dict[str, object]:
+        images = max(self._profile_images, 1)
+        return {
+            "images": self._profile_images,
+            "total_seconds": dict(self._profile_seconds),
+            "seconds_per_image": {
+                key: value / images for key, value in self._profile_seconds.items()
+            },
+        }
 
 
 def resize_image_to_square(image_bgr: np.ndarray, input_size: int) -> tuple[np.ndarray, float]:
@@ -313,22 +353,25 @@ def resize_image_max_side(image_bgr: np.ndarray, max_side: int) -> tuple[np.ndar
 
 
 def generate_retinaface_priors(cfg: dict, height: int, width: int) -> np.ndarray:
-    anchors: list[float] = []
+    anchors: list[np.ndarray] = []
     for min_sizes, step in zip(cfg["min_sizes"], cfg["steps"]):
         feature_height = int(np.ceil(height / step))
         feature_width = int(np.ceil(width / step))
-        for row in range(feature_height):
-            for col in range(feature_width):
-                for min_size in min_sizes:
-                    anchors.extend(
-                        [
-                            (col + 0.5) * step / width,
-                            (row + 0.5) * step / height,
-                            min_size / width,
-                            min_size / height,
-                        ]
-                    )
-    priors = np.asarray(anchors, dtype=np.float32).reshape(-1, 4)
+        rows = (np.arange(feature_height, dtype=np.float32) + 0.5) * step / height
+        cols = (np.arange(feature_width, dtype=np.float32) + 0.5) * step / width
+        grid_x, grid_y = np.meshgrid(cols, rows)
+        centers = np.stack([grid_x, grid_y], axis=-1).reshape(-1, 2)
+        sizes = np.asarray([[min_size / width, min_size / height] for min_size in min_sizes], dtype=np.float32)
+        anchors.append(
+            np.concatenate(
+                [
+                    np.repeat(centers, len(min_sizes), axis=0),
+                    np.tile(sizes, (centers.shape[0], 1)),
+                ],
+                axis=1,
+            )
+        )
+    priors = np.concatenate(anchors, axis=0).astype(np.float32)
     if cfg.get("clip", False):
         np.clip(priors, 0.0, 1.0, out=priors)
     return priors
@@ -456,6 +499,8 @@ def main() -> None:
             resize_mode=args.resize_mode,
         )
     result = evaluate_detector(detector, items=items, image_root=image_root, iou_threshold=args.iou_threshold)
+    if hasattr(detector, "profile_summary"):
+        result["detector_profile"] = detector.profile_summary()
     result["split_file"] = str(split_file)
     result["image_root"] = str(image_root)
     args.output.parent.mkdir(parents=True, exist_ok=True)
