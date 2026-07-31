@@ -4,11 +4,13 @@ import argparse
 import json
 from dataclasses import dataclass
 from pathlib import Path
+import sys
 import time
 from typing import Protocol
 
 import cv2
 import numpy as np
+import torch
 
 
 @dataclass(frozen=True)
@@ -111,6 +113,80 @@ class UnifaceDetector:
         return np.asarray([face.bbox for face in faces], dtype=np.float32)
 
 
+class OwnedRetinaFaceDetector:
+    def __init__(
+        self,
+        repo_path: Path,
+        weights_path: Path,
+        network: str,
+        confidence_threshold: float,
+        nms_threshold: float,
+        pre_nms_topk: int,
+        post_nms_topk: int,
+        device_name: str,
+    ) -> None:
+        self.repo_path = repo_path
+        self.weights_path = weights_path
+        self.network = network
+        self.confidence_threshold = confidence_threshold
+        self.nms_threshold = nms_threshold
+        self.pre_nms_topk = pre_nms_topk
+        self.post_nms_topk = post_nms_topk
+        self.name = f"owned-retinaface:{network}:{weights_path.name}"
+
+        sys.path.insert(0, str(repo_path))
+        from config import get_config
+        from layers import PriorBox
+        from models import RetinaFace
+        from utils.box_utils import decode, decode_landmarks, nms
+
+        self.get_config = get_config
+        self.PriorBox = PriorBox
+        self.decode = decode
+        self.decode_landmarks = decode_landmarks
+        self.nms = nms
+        self.cfg = get_config(network)
+        if self.cfg is None:
+            raise ValueError(f"unsupported owned RetinaFace network: {network}")
+        if device_name == "auto":
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        else:
+            self.device = torch.device(device_name)
+        self.model = RetinaFace(cfg=self.cfg)
+        state_dict = torch.load(weights_path, map_location=self.device, weights_only=True)
+        self.model.load_state_dict(state_dict)
+        self.model.to(self.device)
+        self.model.eval()
+
+    def detect(self, image_bgr: np.ndarray) -> np.ndarray:
+        image = np.float32(image_bgr)
+        image -= (104, 117, 123)
+        image = image.transpose(2, 0, 1)
+        tensor = torch.from_numpy(image).unsqueeze(0).to(self.device)
+        height, width = image_bgr.shape[:2]
+        with torch.no_grad():
+            loc, conf, landmarks = self.model(tensor)
+        loc = loc.squeeze(0)
+        conf = conf.squeeze(0)
+        landmarks = landmarks.squeeze(0)
+        priors = self.PriorBox(self.cfg, image_size=(height, width)).generate_anchors().to(self.device)
+        boxes = self.decode(loc, priors, self.cfg["variance"])
+        landmarks = self.decode_landmarks(landmarks, priors, self.cfg["variance"])
+        bbox_scale = torch.tensor([width, height] * 2, device=self.device)
+        boxes = (boxes * bbox_scale).cpu().numpy()
+        scores = conf[:, 1].detach().cpu().numpy()
+        inds = scores > self.confidence_threshold
+        boxes = boxes[inds]
+        scores = scores[inds]
+        order = scores.argsort()[::-1][: self.pre_nms_topk]
+        boxes = boxes[order]
+        scores = scores[order]
+        detections = np.hstack((boxes, scores[:, np.newaxis])).astype(np.float32, copy=False)
+        keep = self.nms(detections, self.nms_threshold)
+        detections = detections[keep][: self.post_nms_topk]
+        return detections[:, :4].astype(np.float32)
+
+
 def evaluate_detector(
     detector: Detector,
     items: list[WiderFaceItem],
@@ -162,11 +238,17 @@ def main() -> None:
     parser.add_argument("--split", choices=["val", "train"], default="val")
     parser.add_argument("--max-images", type=int, default=200)
     parser.add_argument("--iou-threshold", type=float, default=0.5)
-    parser.add_argument("--detector", choices=["retinaface", "scrfd"], default="retinaface")
+    parser.add_argument("--detector", choices=["retinaface", "scrfd", "owned-retinaface"], default="retinaface")
     parser.add_argument("--detector-model")
     parser.add_argument("--detector-input-size", type=int, default=640)
     parser.add_argument("--detector-conf", type=float, default=0.5)
     parser.add_argument("--detector-nms", type=float, default=0.4)
+    parser.add_argument("--pre-nms-topk", type=int, default=5000)
+    parser.add_argument("--post-nms-topk", type=int, default=750)
+    parser.add_argument("--owned-retinaface-repo", type=Path)
+    parser.add_argument("--owned-retinaface-weights", type=Path)
+    parser.add_argument("--owned-retinaface-network", default="mobilenetv1_0.50")
+    parser.add_argument("--device", default="auto")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
 
@@ -175,13 +257,27 @@ def main() -> None:
         split_file = args.widerface_root / f"wider_face_{args.split}_bbx_gt.txt"
     image_root = args.widerface_root / args.split / "images"
     items = parse_widerface_bbx(split_file, max_images=args.max_images)
-    detector = UnifaceDetector(
-        backend=args.detector,
-        model_name=args.detector_model,
-        confidence_threshold=args.detector_conf,
-        nms_threshold=args.detector_nms,
-        input_size=args.detector_input_size,
-    )
+    if args.detector == "owned-retinaface":
+        if args.owned_retinaface_repo is None or args.owned_retinaface_weights is None:
+            raise ValueError("--owned-retinaface-repo and --owned-retinaface-weights are required")
+        detector: Detector = OwnedRetinaFaceDetector(
+            repo_path=args.owned_retinaface_repo,
+            weights_path=args.owned_retinaface_weights,
+            network=args.owned_retinaface_network,
+            confidence_threshold=args.detector_conf,
+            nms_threshold=args.detector_nms,
+            pre_nms_topk=args.pre_nms_topk,
+            post_nms_topk=args.post_nms_topk,
+            device_name=args.device,
+        )
+    else:
+        detector = UnifaceDetector(
+            backend=args.detector,
+            model_name=args.detector_model,
+            confidence_threshold=args.detector_conf,
+            nms_threshold=args.detector_nms,
+            input_size=args.detector_input_size,
+        )
     result = evaluate_detector(detector, items=items, image_root=image_root, iou_threshold=args.iou_threshold)
     result["split_file"] = str(split_file)
     result["image_root"] = str(image_root)
