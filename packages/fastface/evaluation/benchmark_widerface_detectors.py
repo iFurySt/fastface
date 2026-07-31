@@ -23,6 +23,7 @@ class Detector(Protocol):
     name: str
 
     def detect(self, image_bgr: np.ndarray) -> np.ndarray:
+        """Return detections as Nx5 [x1, y1, x2, y2, score]."""
         ...
 
 
@@ -110,7 +111,9 @@ class UnifaceDetector:
 
     def detect(self, image_bgr: np.ndarray) -> np.ndarray:
         faces = self.detector.detect(image_bgr, max_faces=0, selection_metric="max")
-        return np.asarray([face.bbox for face in faces], dtype=np.float32)
+        if not faces:
+            return np.empty((0, 5), dtype=np.float32)
+        return np.asarray([[*face.bbox, face.score] for face in faces], dtype=np.float32)
 
 
 class OwnedRetinaFaceDetector:
@@ -184,7 +187,7 @@ class OwnedRetinaFaceDetector:
         detections = np.hstack((boxes, scores[:, np.newaxis])).astype(np.float32, copy=False)
         keep = self.nms(detections, self.nms_threshold)
         detections = detections[keep][: self.post_nms_topk]
-        return detections[:, :4].astype(np.float32)
+        return detections[:, :5].astype(np.float32)
 
 
 class OwnedRetinaFaceOnnxDetector:
@@ -261,7 +264,7 @@ class OwnedRetinaFaceOnnxDetector:
         detections = np.hstack((boxes, scores[:, np.newaxis])).astype(np.float32, copy=False)
         keep = self.nms(detections, self.nms_threshold)
         detections = detections[keep][: self.post_nms_topk]
-        return detections[:, :4].astype(np.float32)
+        return detections[:, :5].astype(np.float32)
 
     def _get_priors(self, height: int, width: int) -> np.ndarray:
         key = (height, width)
@@ -350,7 +353,7 @@ def evaluate_detector(
         start = time.perf_counter()
         pred_boxes = detector.detect(image)
         elapsed += time.perf_counter() - start
-        tp, fp, fn = greedy_match(pred_boxes, item.boxes, iou_threshold=iou_threshold)
+        tp, fp, fn = greedy_match(pred_boxes[:, :4] if pred_boxes.size else pred_boxes.reshape(0, 4), item.boxes, iou_threshold=iou_threshold)
         true_positive += tp
         false_positive += fp
         false_negative += fn
