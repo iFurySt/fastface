@@ -85,10 +85,10 @@ if [[ ! -s "${WIDERFACE_DIR}/train/label.txt" && "${ALLOW_PSEUDO_LANDMARKS}" == 
     echo "Could not find wider_face_train_bbx_gt.txt inside ${WIDERFACE_DIR}/wider_face_split.zip" >&2
     exit 7
   fi
-  PYTHONPATH="${PROJECT_DIR}/packages${PYTHONPATH:+:${PYTHONPATH}}" \
-    "${CONDA_BIN}" run -n "${ENV_NAME}" python -m fastface.data.build_widerface_detector_labels \
-      --source "${bbx_file}" \
-      --output "${WIDERFACE_DIR}/train/label.txt"
+  "${CONDA_BIN}" run -n "${ENV_NAME}" python \
+    "${PROJECT_DIR}/packages/fastface/data/build_widerface_detector_labels.py" \
+    --source "${bbx_file}" \
+    --output "${WIDERFACE_DIR}/train/label.txt"
   rm -rf "${tmp_dir}"
 fi
 
