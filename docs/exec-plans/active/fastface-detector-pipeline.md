@@ -281,3 +281,12 @@ Validation notes:
   (`0.08380` landmark error, `0.08510` crop MAE) but recall/F1 were too low.
   Consequence: the detector is not final until the whole-image recall/F1 and
   teacher-landmark alignment gains are combined without losing precision.
+- 2026-07-31: Tried a mixed full+clean teacher-label fine-tune from whole-image
+  960 using full labels plus one extra clean-label pass. The epoch-35 ONNX
+  snapshot moved too far toward precision and lost recall/F1. Evidence on
+  val100: confidence `0.45` reached precision `0.9049`, recall `0.4028`, and F1
+  `0.5575`; confidence `0.55` reached precision `0.9342`, recall `0.3693`, and
+  F1 `0.5294`. Alignment stayed in the teacher-landmark range with mean
+  normalized landmark error `0.0882` and aligned-crop MAE `0.0891`. Consequence:
+  clean-label weighting must be weaker or replaced by score calibration; this
+  mixed-clean run is not a final candidate.

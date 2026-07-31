@@ -74,6 +74,12 @@ whole-image and clean fine-tune candidates improve alignment metrics, but one
 misses precision and the other misses recall/F1, so detector finalization remains
 open.
 
+A mixed full+clean teacher-label fine-tune was also tested from the whole-image
+960 checkpoint. The epoch-35 snapshot preserved teacher-landmark-style alignment
+metrics but shifted too far toward precision: confidence `0.45` reached
+precision `0.9049`, recall `0.4028`, and F1 `0.5575`. This rules out a simple
+full+clean weighted replay as the final path.
+
 ### Files Modified
 
 - `scripts/prepare-widerface-detector-data.sh`
