@@ -107,6 +107,15 @@ Expected non-Git artifacts:
 - `runs/fastfacedetector_retinaface_mobilenetv2_widerface/exports/`
 - `runs/fastfacedetector_retinaface_mobilenetv2_widerface/logs/`
 
+Stronger comparison target:
+
+- Beat UniFace RetinaFace MNetV2 on full WIDER FACE validation F1.
+- Beat or match UniFace RetinaFace MNetV2 on recall.
+- Close the current precision and latency gaps, or record why the tradeoff is
+  acceptable for the FastFace no-face/bbox gate.
+- Add a separate landmark-quality benchmark before calling the detector final
+  for alignment use.
+
 ## Validation
 
 - Commands:
