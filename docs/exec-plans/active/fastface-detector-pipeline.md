@@ -83,6 +83,11 @@ The `label.txt` file must include face boxes and five landmarks in the
 RetinaFace format. Raw WIDER FACE detection boxes alone are insufficient for
 the alignment contract.
 
+If the RetinaFace landmark archive is unavailable, `scripts/prepare-widerface-detector-data.sh`
+can generate bbox-derived pseudo landmarks with `ALLOW_PSEUDO_LANDMARKS=1`.
+That mode is only a bootstrap path for face/no-face and bbox detection; it is
+not a final alignment-quality detector.
+
 Training entry points:
 
 - `scripts/prepare-widerface-detector-data.sh`
@@ -127,8 +132,9 @@ Expected non-Git artifacts:
 - [x] Document the detector training path and GPU workflow.
 - [x] Run local validation.
 - [x] Add detector data preparation and RetinaFace training wrapper scripts.
-- [ ] Stage WIDER FACE images and RetinaFace landmark labels on the GPU host.
-- [ ] Start the first `fastfacedetector` RetinaFace-MobileNetV2 training run.
+- [ ] Stage WIDER FACE images and RetinaFace label data on the GPU host.
+- [ ] Start the first `fastfacedetector` RetinaFace-MobileNetV2 bootstrap
+  training run.
 
 Validation notes:
 
@@ -168,3 +174,8 @@ Validation notes:
   slice. Rationale: it has a direct WIDER FACE + 5-point-landmark PyTorch
   training path with MIT reference code. Consequence: SCRFD remains a later
   architecture target after the detector data and pipeline contract are proven.
+- 2026-07-31: Allow bbox-derived pseudo landmarks only for bootstrap training
+  when RetinaFace landmark labels are unavailable. Rationale: WIDER FACE bbox
+  annotations are easy to stage and let us train an owned no-face/bbox detector
+  while the 5-point landmark archive is blocked. Consequence: bootstrap weights
+  must not be treated as the final alignment detector.

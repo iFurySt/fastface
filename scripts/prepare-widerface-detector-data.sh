@@ -8,6 +8,7 @@ ENV_NAME="${ENV_NAME:-faceattr}"
 WIDERFACE_DIR="${WIDERFACE_DIR:-${WORK_ROOT}/data/raw/widerface}"
 DOWNLOAD_IMAGES="${DOWNLOAD_IMAGES:-1}"
 DOWNLOAD_RETINAFACE_GT="${DOWNLOAD_RETINAFACE_GT:-1}"
+ALLOW_PSEUDO_LANDMARKS="${ALLOW_PSEUDO_LANDMARKS:-0}"
 WIDERFACE_BASE_URL="${WIDERFACE_BASE_URL:-https://huggingface.co/datasets/wider_face/resolve/main/data}"
 RETINAFACE_GT_ZIP="${RETINAFACE_GT_ZIP:-${WIDERFACE_DIR}/retinaface_gt_v1.1.zip}"
 RETINAFACE_GT_URL="${RETINAFACE_GT_URL:-https://www.dropbox.com/s/7j70r3eeepe4r2g/retinaface_gt_v1.1.zip?dl=1}"
@@ -31,9 +32,10 @@ download_file() {
 if [[ "${DOWNLOAD_IMAGES}" == "1" ]]; then
   download_file "${WIDERFACE_BASE_URL}/WIDER_train.zip" "${WIDERFACE_DIR}/WIDER_train.zip"
   download_file "${WIDERFACE_BASE_URL}/WIDER_val.zip" "${WIDERFACE_DIR}/WIDER_val.zip"
+  download_file "${WIDERFACE_BASE_URL}/wider_face_split.zip" "${WIDERFACE_DIR}/wider_face_split.zip"
 fi
 
-if [[ "${DOWNLOAD_RETINAFACE_GT}" == "1" ]]; then
+if [[ "${DOWNLOAD_RETINAFACE_GT}" == "1" && ! -s "${RETINAFACE_GT_ZIP}" ]]; then
   download_file "${RETINAFACE_GT_URL}" "${RETINAFACE_GT_ZIP}"
 fi
 
@@ -54,7 +56,7 @@ if [[ -s "${WIDERFACE_DIR}/WIDER_train.zip" && ! -d "${WIDERFACE_DIR}/train/imag
   rm -rf "${tmp_dir}"
 fi
 
-if [[ -s "${RETINAFACE_GT_ZIP}" && ! -s "${WIDERFACE_DIR}/train/label.txt" ]]; then
+if [[ -s "${RETINAFACE_GT_ZIP}" && ! -s "${WIDERFACE_DIR}/train/label.txt" ]] && unzip -t "${RETINAFACE_GT_ZIP}" >/dev/null 2>&1; then
   tmp_dir="${WIDERFACE_DIR}/_extract_retinaface_gt"
   rm -rf "${tmp_dir}"
   mkdir -p "${tmp_dir}"
@@ -66,6 +68,75 @@ if [[ -s "${RETINAFACE_GT_ZIP}" && ! -s "${WIDERFACE_DIR}/train/label.txt" ]]; t
   fi
   mkdir -p "${WIDERFACE_DIR}/train"
   cp "${label_path}" "${WIDERFACE_DIR}/train/label.txt"
+  rm -rf "${tmp_dir}"
+fi
+
+if [[ ! -s "${WIDERFACE_DIR}/train/label.txt" && "${ALLOW_PSEUDO_LANDMARKS}" == "1" ]]; then
+  if [[ ! -s "${WIDERFACE_DIR}/wider_face_split.zip" ]]; then
+    echo "Missing wider_face_split.zip for pseudo landmark bootstrap labels" >&2
+    exit 6
+  fi
+  tmp_dir="${WIDERFACE_DIR}/_extract_wider_split"
+  rm -rf "${tmp_dir}"
+  mkdir -p "${tmp_dir}"
+  unzip -q "${WIDERFACE_DIR}/wider_face_split.zip" -d "${tmp_dir}"
+  bbx_file="$(find "${tmp_dir}" -type f -name wider_face_train_bbx_gt.txt | head -1)"
+  if [[ -z "${bbx_file}" ]]; then
+    echo "Could not find wider_face_train_bbx_gt.txt inside ${WIDERFACE_DIR}/wider_face_split.zip" >&2
+    exit 7
+  fi
+  "${CONDA_BIN}" run -n "${ENV_NAME}" python - "${bbx_file}" "${WIDERFACE_DIR}/train/label.txt" <<'PY'
+from __future__ import annotations
+
+from pathlib import Path
+import sys
+
+source = Path(sys.argv[1])
+output = Path(sys.argv[2])
+lines = source.read_text(encoding="utf-8").splitlines()
+output.parent.mkdir(parents=True, exist_ok=True)
+
+idx = 0
+written_images = 0
+written_faces = 0
+with output.open("w", encoding="utf-8") as handle:
+    while idx < len(lines):
+        image_name = lines[idx].strip()
+        idx += 1
+        if not image_name:
+            continue
+        face_count = int(lines[idx].strip())
+        idx += 1
+        faces = []
+        for _ in range(face_count):
+            parts = [float(value) for value in lines[idx].strip().split()]
+            idx += 1
+            x, y, w, h = parts[:4]
+            if w <= 1 or h <= 1:
+                continue
+            # Bootstrap labels when true RetinaFace landmarks are unavailable.
+            # They are stable face-box anchors, not human-labeled landmarks.
+            points = [
+                (x + 0.35 * w, y + 0.40 * h),
+                (x + 0.65 * w, y + 0.40 * h),
+                (x + 0.50 * w, y + 0.55 * h),
+                (x + 0.38 * w, y + 0.75 * h),
+                (x + 0.62 * w, y + 0.75 * h),
+            ]
+            row = [x, y, w, h]
+            for px, py in points:
+                row.extend([px, py, 0.0])
+            faces.append(row)
+        if not faces:
+            continue
+        handle.write(f"# {image_name}\n")
+        for row in faces:
+            handle.write(" ".join(f"{value:.3f}" for value in row) + "\n")
+            written_faces += 1
+        written_images += 1
+
+print(f"wrote {written_images} images and {written_faces} pseudo-landmark faces to {output}")
+PY
   rm -rf "${tmp_dir}"
 fi
 
@@ -81,6 +152,9 @@ Place the RetinaFace landmark archive at:
 
 Then rerun this script. The archive is commonly named retinaface_gt_v1.1.zip
 and contains the training label.txt used by RetinaFace implementations.
+
+For a bbox-first bootstrap detector, rerun with:
+  ALLOW_PSEUDO_LANDMARKS=1 bash scripts/prepare-widerface-detector-data.sh
 EOF
   exit 4
 fi
