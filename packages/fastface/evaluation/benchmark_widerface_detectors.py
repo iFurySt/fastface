@@ -198,6 +198,7 @@ class OwnedRetinaFaceOnnxDetector:
         pre_nms_topk: int,
         post_nms_topk: int,
         input_size: int | None,
+        resize_mode: str,
     ) -> None:
         self.repo_path = repo_path
         self.model_path = model_path
@@ -207,6 +208,7 @@ class OwnedRetinaFaceOnnxDetector:
         self.pre_nms_topk = pre_nms_topk
         self.post_nms_topk = post_nms_topk
         self.input_size = input_size
+        self.resize_mode = resize_mode
         self._prior_cache: dict[tuple[int, int], np.ndarray] = {}
         self.name = f"owned-retinaface-onnx:{network}:{model_path.name}"
 
@@ -227,7 +229,12 @@ class OwnedRetinaFaceOnnxDetector:
     def detect(self, image_bgr: np.ndarray) -> np.ndarray:
         original_height, original_width = image_bgr.shape[:2]
         if self.input_size is not None and self.input_size > 0:
-            image, resize_factor = resize_image_to_square(image_bgr, self.input_size)
+            if self.resize_mode == "square":
+                image, resize_factor = resize_image_to_square(image_bgr, self.input_size)
+            elif self.resize_mode == "max-side":
+                image, resize_factor = resize_image_max_side(image_bgr, self.input_size)
+            else:
+                raise ValueError(f"unsupported resize mode: {self.resize_mode}")
         else:
             image = image_bgr
             resize_factor = 1.0
@@ -276,6 +283,19 @@ def resize_image_to_square(image_bgr: np.ndarray, input_size: int) -> tuple[np.n
     canvas = np.zeros((input_size, input_size, 3), dtype=image_bgr.dtype)
     canvas[: resized.shape[0], : resized.shape[1]] = resized
     return canvas, resize_factor
+
+
+def resize_image_max_side(image_bgr: np.ndarray, max_side: int) -> tuple[np.ndarray, float]:
+    height, width = image_bgr.shape[:2]
+    resize_factor = min(1.0, max_side / max(height, width))
+    if resize_factor == 1.0:
+        return image_bgr, 1.0
+    resized = cv2.resize(
+        image_bgr,
+        (int(round(width * resize_factor)), int(round(height * resize_factor))),
+        interpolation=cv2.INTER_LINEAR,
+    )
+    return resized, resize_factor
 
 
 def generate_retinaface_priors(cfg: dict, height: int, width: int) -> np.ndarray:
@@ -367,6 +387,7 @@ def main() -> None:
     )
     parser.add_argument("--detector-model")
     parser.add_argument("--detector-input-size", type=int, default=640)
+    parser.add_argument("--resize-mode", choices=["square", "max-side"], default="square")
     parser.add_argument("--detector-conf", type=float, default=0.5)
     parser.add_argument("--detector-nms", type=float, default=0.4)
     parser.add_argument("--pre-nms-topk", type=int, default=5000)
@@ -409,6 +430,7 @@ def main() -> None:
             pre_nms_topk=args.pre_nms_topk,
             post_nms_topk=args.post_nms_topk,
             input_size=args.detector_input_size,
+            resize_mode=args.resize_mode,
         )
     else:
         detector = UnifaceDetector(
@@ -417,6 +439,7 @@ def main() -> None:
             confidence_threshold=args.detector_conf,
             nms_threshold=args.detector_nms,
             input_size=args.detector_input_size,
+            resize_mode=args.resize_mode,
         )
     result = evaluate_detector(detector, items=items, image_root=image_root, iou_threshold=args.iou_threshold)
     result["split_file"] = str(split_file)
