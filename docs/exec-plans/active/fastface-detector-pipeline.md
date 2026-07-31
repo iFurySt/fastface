@@ -116,6 +116,17 @@ Stronger comparison target:
 - Add a separate landmark-quality benchmark before calling the detector final
   for alignment use.
 
+Follow-up experiments:
+
+- `fastfacedetector_retinaface_mobilenetv1_050_teacher_retinaface_mnetv2`:
+  trains on WIDER FACE boxes with UniFace RetinaFace MNetV2 teacher landmarks
+  where teacher boxes match GT boxes, falling back to bbox-derived landmarks.
+- `fastfacedetector_retinaface_mobilenetv1_050_teacher_retinaface_mnetv2_fixed640`:
+  uses the same teacher-label data with a remote training-worktree augmentation
+  patch that preserves whole-image scale distribution for fixed-640 inference.
+- `fastfacedetector_retinaface_mobilenetv2_widerface_bootstrap`: tests the
+  stronger MobileNetV2 backbone offline with pretrained weights disabled.
+
 ## Validation
 
 - Commands:
@@ -150,6 +161,10 @@ Stronger comparison target:
 - [x] Benchmark the owned detector against UniFace RetinaFace/SCRFD on WIDER
   FACE validation boxes.
 - [x] Export the owned detector to ONNX and verify ONNX Runtime can load it.
+- [x] Add UniFace teacher pseudo-landmark label generation.
+- [x] Start teacher-label and fixed-640-friendly follow-up training runs.
+- [ ] Decide whether teacher-label or fixed-640 training closes precision,
+  latency, and landmark-quality gaps.
 
 Validation notes:
 
@@ -202,3 +217,8 @@ Validation notes:
   `0.87753`, recall `0.44552`, and F1 `0.59099` on the same split. Consequence:
   the bootstrap detector satisfies the current bbox-detection target, while
   real landmark labels remain a future alignment-quality improvement.
+- 2026-07-31: Dynamic/original-size ONNX inference can exceed UniFace RetinaFace
+  MNetV2 on F1, precision, and recall after threshold tuning, but still lags
+  latency. Fixed-640 inference gets closer to UniFace latency but loses too much
+  recall, so the latency gap is a training-scale distribution issue rather than
+  only a postprocessing issue.
