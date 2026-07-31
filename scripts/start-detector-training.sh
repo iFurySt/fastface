@@ -8,6 +8,7 @@ ENV_NAME="${ENV_NAME:-faceattr}"
 
 DETECTOR_REPO_URL="${DETECTOR_REPO_URL:-https://github.com/yakhyo/retinaface-pytorch.git}"
 DETECTOR_REPO_DIR="${DETECTOR_REPO_DIR:-${WORK_ROOT}/third_party/retinaface-pytorch}"
+DETECTOR_REPO_UPDATE="${DETECTOR_REPO_UPDATE:-1}"
 WIDERFACE_DIR="${WIDERFACE_DIR:-${WORK_ROOT}/data/raw/widerface}"
 RUN_NAME="${RUN_NAME:-fastfacedetector_retinaface_mobilenetv2_widerface}"
 RUN_DIR="${RUN_DIR:-${WORK_ROOT}/runs/${RUN_NAME}}"
@@ -21,7 +22,7 @@ RESUME="${RESUME:-0}"
 if [[ ! -d "${DETECTOR_REPO_DIR}/.git" ]]; then
   mkdir -p "$(dirname "${DETECTOR_REPO_DIR}")"
   git clone "${DETECTOR_REPO_URL}" "${DETECTOR_REPO_DIR}"
-else
+elif [[ "${DETECTOR_REPO_UPDATE}" == "1" ]]; then
   git -C "${DETECTOR_REPO_DIR}" pull --ff-only
 fi
 
