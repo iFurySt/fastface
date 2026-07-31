@@ -9,6 +9,7 @@ ENV_NAME="${ENV_NAME:-faceattr}"
 DETECTOR_REPO_URL="${DETECTOR_REPO_URL:-https://github.com/yakhyo/retinaface-pytorch.git}"
 DETECTOR_REPO_DIR="${DETECTOR_REPO_DIR:-${WORK_ROOT}/third_party/retinaface-pytorch}"
 DETECTOR_REPO_UPDATE="${DETECTOR_REPO_UPDATE:-1}"
+INSTALL_DETECTOR_REQUIREMENTS="${INSTALL_DETECTOR_REQUIREMENTS:-0}"
 WIDERFACE_DIR="${WIDERFACE_DIR:-${WORK_ROOT}/data/raw/widerface}"
 RUN_NAME="${RUN_NAME:-fastfacedetector_retinaface_mobilenetv2_widerface}"
 RUN_DIR="${RUN_DIR:-${WORK_ROOT}/runs/${RUN_NAME}}"
@@ -41,7 +42,9 @@ fi
 
 mkdir -p "${RUN_DIR}/weights" "${RUN_DIR}/logs" "${RUN_DIR}/exports"
 
-"${CONDA_BIN}" run -n "${ENV_NAME}" python -m pip install -r "${DETECTOR_REPO_DIR}/requirements.txt"
+if [[ "${INSTALL_DETECTOR_REQUIREMENTS}" == "1" ]]; then
+  "${CONDA_BIN}" run -n "${ENV_NAME}" python -m pip install -r "${DETECTOR_REPO_DIR}/requirements.txt"
+fi
 
 {
   echo "run_name=${RUN_NAME}"
