@@ -21,6 +21,7 @@ FastFace is a CPU-efficient face age and gender model family. Phase 1 freezes th
 | `fastface-large-128` | Recommended accuracy/throughput student | aligned RGB face crop, 128x128 | `models/fastface-large-128/model_fp32.onnx` |
 | `fastface-small-112` | Highest-throughput student | aligned RGB face crop, 112x112 | `models/fastface-small-112/model_fp32.onnx` |
 | `fastface-teacher-v2s-128` | Audit/teacher model, not CPU default | aligned RGB face crop, 128x128 | `models/fastface-teacher-v2s-128/model_fp32.onnx` |
+| `fastfacedetector-retinaface-mnetv1-960` | Full-image face detector and 5-point alignment stage | raw BGR/RGB image | `models/fastfacedetector-retinaface-mnetv1-960/fastfacedetector_retinaface_mobilenetv1_050_whole960_epoch34.onnx` |
 
 The released task is gender classification plus numeric age estimation. Race prediction is intentionally out of scope.
 
@@ -54,6 +55,13 @@ In a 24,333-sample comparison set, gender balanced accuracy was:
 
 Public FairFace-ONNX vs `fastface-large-128` disagreed on 1,301 samples. Against the available public labels, `fastface-large-128` was correct on 762 of those and public FairFace-ONNX was correct on 539.
 
+The detector candidate was evaluated on full WIDER FACE validation:
+
+| Detector | Precision | Recall | F1 | Seconds/Image |
+| --- | ---: | ---: | ---: | ---: |
+| `fastfacedetector-retinaface-mnetv1-960` | 0.87832 | 0.48082 | 0.62144 | 0.02088 |
+| UniFace RetinaFace MNetV2 baseline | 0.87753 | 0.44552 | 0.59099 | 0.02699 |
+
 ## Intended Use
 
 - High-throughput CPU inference on already-detected/aligned face crops.
@@ -62,7 +70,10 @@ Public FairFace-ONNX vs `fastface-large-128` disagreed on 1,301 samples. Against
 
 ## Limitations
 
-- The model does not detect faces; it expects aligned face crops.
+- The age/gender models do not detect faces; they expect aligned face crops.
+- The detector candidate provides the raw-image face detection and 5-point
+  alignment stage, but its alignment benchmark uses UniFace RetinaFace MNetV2 as
+  the comparison baseline rather than human landmark annotations.
 - Age labels are noisy across public face-age datasets, so age should be treated as an estimate.
 - Gender labels follow dataset annotations and can encode social and labeling bias.
 - Race/ethnicity classification is not provided.

@@ -91,6 +91,10 @@ aligned-crop MAE `0.0896`, mean FastFace age difference `4.2993`, and gender
 agreement `0.8740`. End-to-end owned-detector pipeline smoke tests passed for
 both `landmark_5pt` face crops and no-face rejection.
 
+The Hugging Face staging script now supports a detector variant so the ONNX
+model, external ONNX data file, benchmark JSON files, run metadata, and detector
+model card can be staged without committing large binaries to GitHub.
+
 ### Files Modified
 
 - `scripts/prepare-widerface-detector-data.sh`
@@ -101,4 +105,7 @@ both `landmark_5pt` face crops and no-face rejection.
 - `packages/fastface/pipeline/detectors.py`
 - `packages/fastface/pipeline/predict_image.py`
 - `docs/SERVING_CONTRACT.md`
+- `docs/MODEL_RELEASE.md`
+- `docs/cards/fastfacedetector-model-card.md`
+- `scripts/stage-hf-release.sh`
 - `docs/exec-plans/active/fastface-detector-pipeline.md`

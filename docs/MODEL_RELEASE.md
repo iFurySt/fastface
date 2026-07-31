@@ -56,6 +56,7 @@ Hugging Face is the better fit for:
 | `fastface-large-128` | `models/fastface-large-128/` | accuracy-oriented CPU candidate | PyTorch checkpoint, FP32 ONNX, static INT8 ONNX, config, metrics, eval, CPU benchmarks |
 | `fastface-small-112` | `models/fastface-small-112/` | throughput-oriented CPU candidate | PyTorch checkpoint, FP32 ONNX, static INT8 ONNX, config, metrics, eval, CPU benchmarks |
 | `fastface-teacher-v2s-128` | `models/fastface-teacher-v2s-128/` | teacher/evaluation artifact | PyTorch checkpoint, FP32 ONNX, static INT8 ONNX, config, metrics, eval, CPU benchmarks |
+| `fastfacedetector-retinaface-mnetv1-960` | `models/fastfacedetector-retinaface-mnetv1-960/` | full-image detector release candidate | FP32 ONNX, external ONNX data file, WIDER FACE benchmark, alignment benchmark, runtime card |
 
 The public FairFace-ONNX baseline is not redistributed in the FastFace model
 repo; it is referenced as an external baseline.
@@ -82,6 +83,13 @@ models/
     ...
   fastface-teacher-v2s-128/
     ...
+  fastfacedetector-retinaface-mnetv1-960/
+    fastfacedetector_retinaface_mobilenetv1_050_whole960_epoch34.onnx
+    mobilenetv1_0.50_last.onnx.data
+    benchmark_widerface_val.json
+    benchmark_alignment_val50.json
+    run.env
+    model_card.md
 reports/
   gender-comparison-summary.json
   manual-public-gender-review-schema.md
@@ -93,6 +101,7 @@ reports/
 runs/mobilenetv3_large128_imdb_source_balanced_distill_gender_priority_efficientnet_v2_s_imdb_fairface_utkface
 runs/mobilenetv3_small112_imdb_source_balanced_distill_gender_priority_efficientnet_v2_s_imdb_fairface_utkface
 runs/efficientnet_v2_s_128_imdb_source_balanced_gender_priority_real_fairface_utkface
+runs/fastfacedetector_retinaface_mobilenetv1_050_teacher_retinaface_mnetv2_whole960
 ```
 
 ## Upload Checklist
@@ -103,6 +112,10 @@ runs/efficientnet_v2_s_128_imdb_source_balanced_gender_priority_real_fairface_ut
    ```sh
    make stage-hf-release
    ```
+
+   Include the detector by setting `DETECTOR_RUN`, `DETECTOR_ONNX`,
+   `DETECTOR_ONNX_DATA`, `DETECTOR_BENCHMARK`, and
+   `DETECTOR_ALIGNMENT_BENCHMARK`.
 
 3. Upload with:
 

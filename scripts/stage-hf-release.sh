@@ -8,6 +8,12 @@ LARGE_RUN="${LARGE_RUN:?LARGE_RUN is required}"
 SMALL_RUN="${SMALL_RUN:?SMALL_RUN is required}"
 TEACHER_RUN="${TEACHER_RUN:?TEACHER_RUN is required}"
 COMPARISON_DIR="${COMPARISON_DIR:-}"
+DETECTOR_RUN="${DETECTOR_RUN:-}"
+DETECTOR_ONNX="${DETECTOR_ONNX:-}"
+DETECTOR_ONNX_DATA="${DETECTOR_ONNX_DATA:-}"
+DETECTOR_BENCHMARK="${DETECTOR_BENCHMARK:-}"
+DETECTOR_ALIGNMENT_BENCHMARK="${DETECTOR_ALIGNMENT_BENCHMARK:-}"
+PYTHON_BIN="${PYTHON_BIN:-python3}"
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${repo_root}"
@@ -57,6 +63,21 @@ stage_variant "fastface-large-128" "${LARGE_RUN}"
 stage_variant "fastface-small-112" "${SMALL_RUN}"
 stage_variant "fastface-teacher-v2s-128" "${TEACHER_RUN}"
 
+if [[ -n "${DETECTOR_RUN}" ]]; then
+  detector_dir="${DEST_DIR}/models/fastfacedetector-retinaface-mnetv1-960"
+  mkdir -p "${detector_dir}"
+  copy_file "${DETECTOR_ONNX:?DETECTOR_ONNX is required when DETECTOR_RUN is set}" \
+    "${detector_dir}/fastfacedetector_retinaface_mobilenetv1_050_whole960_epoch34.onnx"
+  copy_file "${DETECTOR_ONNX_DATA:?DETECTOR_ONNX_DATA is required when DETECTOR_RUN is set}" \
+    "${detector_dir}/mobilenetv1_0.50_last.onnx.data"
+  copy_file "${DETECTOR_BENCHMARK:?DETECTOR_BENCHMARK is required when DETECTOR_RUN is set}" \
+    "${detector_dir}/benchmark_widerface_val.json"
+  copy_file "${DETECTOR_ALIGNMENT_BENCHMARK:?DETECTOR_ALIGNMENT_BENCHMARK is required when DETECTOR_RUN is set}" \
+    "${detector_dir}/benchmark_alignment_val50.json"
+  copy_optional_file "${DETECTOR_RUN%/}/run.env" "${detector_dir}/run.env"
+  copy_file "docs/cards/fastfacedetector-model-card.md" "${detector_dir}/model_card.md"
+fi
+
 copy_file "docs/cards/fastface-hf-model-card.md" "${DEST_DIR}/README.md"
 copy_file "docs/TECHNICAL_REPORT.md" "${DEST_DIR}/technical_report.md"
 copy_file "docs/DATA_PROVENANCE.md" "${DEST_DIR}/data_provenance.md"
@@ -98,7 +119,7 @@ Important columns:
 - `confidence_gap`
 MARKDOWN
 
-python - "${DEST_DIR}" "${RELEASE_ID}" > "${DEST_DIR}/release_manifest.json" <<'PY'
+"${PYTHON_BIN}" - "${DEST_DIR}" "${RELEASE_ID}" > "${DEST_DIR}/release_manifest.json" <<'PY'
 import hashlib
 import json
 import pathlib
