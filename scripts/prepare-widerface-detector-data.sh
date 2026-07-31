@@ -7,32 +7,34 @@ CONDA_BIN="${CONDA_BIN:-conda}"
 ENV_NAME="${ENV_NAME:-faceattr}"
 WIDERFACE_DIR="${WIDERFACE_DIR:-${WORK_ROOT}/data/raw/widerface}"
 DOWNLOAD_IMAGES="${DOWNLOAD_IMAGES:-1}"
+DOWNLOAD_RETINAFACE_GT="${DOWNLOAD_RETINAFACE_GT:-1}"
+WIDERFACE_BASE_URL="${WIDERFACE_BASE_URL:-https://huggingface.co/datasets/wider_face/resolve/main/data}"
 RETINAFACE_GT_ZIP="${RETINAFACE_GT_ZIP:-${WIDERFACE_DIR}/retinaface_gt_v1.1.zip}"
+RETINAFACE_GT_URL="${RETINAFACE_GT_URL:-https://www.dropbox.com/s/7j70r3eeepe4r2g/retinaface_gt_v1.1.zip?dl=1}"
 
 mkdir -p "${WIDERFACE_DIR}" "${WORK_ROOT}/logs/downloads"
 
+download_file() {
+  local url="$1"
+  local output="$2"
+  if [[ -s "${output}" ]]; then
+    echo "present: ${output}"
+    return 0
+  fi
+  mkdir -p "$(dirname "${output}")"
+  curl -L --fail --retry 5 --retry-delay 3 --connect-timeout 30 \
+    -o "${output}.tmp" \
+    "${url}"
+  mv "${output}.tmp" "${output}"
+}
+
 if [[ "${DOWNLOAD_IMAGES}" == "1" ]]; then
-  "${CONDA_BIN}" run -n "${ENV_NAME}" python - <<'PY'
-from pathlib import Path
-import sys
+  download_file "${WIDERFACE_BASE_URL}/WIDER_train.zip" "${WIDERFACE_DIR}/WIDER_train.zip"
+  download_file "${WIDERFACE_BASE_URL}/WIDER_val.zip" "${WIDERFACE_DIR}/WIDER_val.zip"
+fi
 
-try:
-    from huggingface_hub import hf_hub_download
-except Exception as exc:
-    raise SystemExit(f"huggingface_hub is required to download WIDER FACE images: {exc}") from exc
-
-out_dir = Path(sys.argv[1])
-out_dir.mkdir(parents=True, exist_ok=True)
-for filename in ["WIDER_train.zip", "WIDER_val.zip"]:
-    path = hf_hub_download(
-        repo_id="wider_face",
-        repo_type="dataset",
-        filename=filename,
-        local_dir=out_dir,
-        local_dir_use_symlinks=False,
-    )
-    print(path)
-PY
+if [[ "${DOWNLOAD_RETINAFACE_GT}" == "1" ]]; then
+  download_file "${RETINAFACE_GT_URL}" "${RETINAFACE_GT_ZIP}"
 fi
 
 if [[ -s "${WIDERFACE_DIR}/WIDER_train.zip" && ! -d "${WIDERFACE_DIR}/train/images" ]]; then
