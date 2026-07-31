@@ -187,6 +187,68 @@ class OwnedRetinaFaceDetector:
         return detections[:, :4].astype(np.float32)
 
 
+class OwnedRetinaFaceOnnxDetector:
+    def __init__(
+        self,
+        repo_path: Path,
+        model_path: Path,
+        network: str,
+        confidence_threshold: float,
+        nms_threshold: float,
+        pre_nms_topk: int,
+        post_nms_topk: int,
+    ) -> None:
+        self.repo_path = repo_path
+        self.model_path = model_path
+        self.network = network
+        self.confidence_threshold = confidence_threshold
+        self.nms_threshold = nms_threshold
+        self.pre_nms_topk = pre_nms_topk
+        self.post_nms_topk = post_nms_topk
+        self.name = f"owned-retinaface-onnx:{network}:{model_path.name}"
+
+        sys.path.insert(0, str(repo_path))
+        from config import get_config
+        from layers import PriorBox
+        from utils.box_utils import decode, nms
+
+        self.PriorBox = PriorBox
+        self.decode = decode
+        self.nms = nms
+        self.cfg = get_config(network)
+        if self.cfg is None:
+            raise ValueError(f"unsupported owned RetinaFace network: {network}")
+        import onnxruntime as ort
+
+        self.session = ort.InferenceSession(str(model_path), providers=["CPUExecutionProvider"])
+        self.input_name = self.session.get_inputs()[0].name
+        self.output_names = [output.name for output in self.session.get_outputs()]
+
+    def detect(self, image_bgr: np.ndarray) -> np.ndarray:
+        image = np.float32(image_bgr)
+        image -= (104, 117, 123)
+        image = image.transpose(2, 0, 1)[np.newaxis].astype(np.float32)
+        height, width = image_bgr.shape[:2]
+        outputs = self.session.run(self.output_names, {self.input_name: image})
+        loc = torch.from_numpy(np.asarray(outputs[0]).squeeze(0))
+        conf = np.asarray(outputs[1]).squeeze(0)
+        priors = self.PriorBox(self.cfg, image_size=(height, width)).generate_anchors()
+        boxes = self.decode(loc, priors, self.cfg["variance"])
+        bbox_scale = torch.tensor([width, height] * 2)
+        boxes = (boxes * bbox_scale).numpy()
+        scores = conf[:, 1]
+        inds = scores > self.confidence_threshold
+        boxes = boxes[inds]
+        scores = scores[inds]
+        order = scores.argsort()[::-1][: self.pre_nms_topk]
+        boxes = boxes[order]
+        scores = scores[order]
+        detections = np.hstack((boxes, scores[:, np.newaxis])).astype(np.float32, copy=False)
+        keep = self.nms(detections, self.nms_threshold)
+        detections = detections[keep][: self.post_nms_topk]
+        return detections[:, :4].astype(np.float32)
+
+
 def evaluate_detector(
     detector: Detector,
     items: list[WiderFaceItem],
@@ -238,7 +300,11 @@ def main() -> None:
     parser.add_argument("--split", choices=["val", "train"], default="val")
     parser.add_argument("--max-images", type=int, default=200)
     parser.add_argument("--iou-threshold", type=float, default=0.5)
-    parser.add_argument("--detector", choices=["retinaface", "scrfd", "owned-retinaface"], default="retinaface")
+    parser.add_argument(
+        "--detector",
+        choices=["retinaface", "scrfd", "owned-retinaface", "owned-retinaface-onnx"],
+        default="retinaface",
+    )
     parser.add_argument("--detector-model")
     parser.add_argument("--detector-input-size", type=int, default=640)
     parser.add_argument("--detector-conf", type=float, default=0.5)
@@ -247,6 +313,7 @@ def main() -> None:
     parser.add_argument("--post-nms-topk", type=int, default=750)
     parser.add_argument("--owned-retinaface-repo", type=Path)
     parser.add_argument("--owned-retinaface-weights", type=Path)
+    parser.add_argument("--owned-retinaface-onnx", type=Path)
     parser.add_argument("--owned-retinaface-network", default="mobilenetv1_0.50")
     parser.add_argument("--device", default="auto")
     parser.add_argument("--output", type=Path, required=True)
@@ -269,6 +336,18 @@ def main() -> None:
             pre_nms_topk=args.pre_nms_topk,
             post_nms_topk=args.post_nms_topk,
             device_name=args.device,
+        )
+    elif args.detector == "owned-retinaface-onnx":
+        if args.owned_retinaface_repo is None or args.owned_retinaface_onnx is None:
+            raise ValueError("--owned-retinaface-repo and --owned-retinaface-onnx are required")
+        detector = OwnedRetinaFaceOnnxDetector(
+            repo_path=args.owned_retinaface_repo,
+            model_path=args.owned_retinaface_onnx,
+            network=args.owned_retinaface_network,
+            confidence_threshold=args.detector_conf,
+            nms_threshold=args.detector_nms,
+            pre_nms_topk=args.pre_nms_topk,
+            post_nms_topk=args.post_nms_topk,
         )
     else:
         detector = UnifaceDetector(
