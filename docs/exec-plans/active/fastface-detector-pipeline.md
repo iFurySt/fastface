@@ -126,6 +126,12 @@ Follow-up experiments:
   patch that preserves whole-image scale distribution for fixed-640 inference.
 - `fastfacedetector_retinaface_mobilenetv2_widerface_bootstrap`: tests the
   stronger MobileNetV2 backbone offline with pretrained weights disabled.
+- `fastfacedetector_retinaface_mobilenetv1_050_teacher_retinaface_mnetv2_whole960`:
+  uses whole-image teacher-label training at image size 960 to preserve small
+  face recall before later threshold and precision tuning.
+- `fastfacedetector_retinaface_mobilenetv1_050_teacher_retinaface_mnetv2_whole960_clean_ft`:
+  resumes the whole-image 960 run on teacher-only clean labels to test whether
+  precision can improve without losing the recall/F1 gains.
 
 ## Validation
 
@@ -234,3 +240,16 @@ Validation notes:
   higher confidence improves precision but lowers F1/recall. Clean teacher-only
   fixed-640 training started as a high-precision follow-up and reached val100 F1
   `0.52491` at epoch 13.
+- 2026-07-31: Whole-image 960 training improves val100 F1 but still does not
+  satisfy the full target after threshold tuning. Evidence from the epoch-34
+  start snapshot: confidence `0.45` reached precision `0.77907`, recall
+  `0.49889`, and F1 `0.60827`; confidence `0.75` reached precision `0.91367`
+  but recall fell to `0.40144` and F1 to `0.55780`. Consequence: simple
+  threshold tuning cannot simultaneously beat UniFace RetinaFace MNetV2 on
+  precision, recall, and F1.
+- 2026-07-31: Clean teacher-only fine-tuning from the whole-image 960 checkpoint
+  shifts the curve toward precision but loses too much recall/F1. Evidence from
+  the epoch-36 snapshot on val100: confidence `0.55` reached precision
+  `0.87950`, recall `0.40421`, and F1 `0.55391`; confidence `0.75` reached
+  precision `0.94315`, recall `0.33970`, and F1 `0.49949`. Consequence: this
+  route is useful as a precision ceiling but is not the final detector route.

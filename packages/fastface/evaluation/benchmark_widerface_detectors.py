@@ -96,7 +96,18 @@ def greedy_match(pred_boxes: np.ndarray, target_boxes: np.ndarray, iou_threshold
 
 
 class UnifaceDetector:
-    def __init__(self, backend: str, model_name: str | None, confidence_threshold: float, nms_threshold: float, input_size: int) -> None:
+    def __init__(
+        self,
+        backend: str,
+        model_name: str | None,
+        confidence_threshold: float,
+        nms_threshold: float,
+        input_size: int,
+        resize_mode: str,
+    ) -> None:
+        if resize_mode != "square":
+            raise ValueError("UniFace detector benchmarks only support square input resizing")
+
         from fastface.pipeline.detectors import build_detector
 
         self.detector = build_detector(

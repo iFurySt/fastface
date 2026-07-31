@@ -39,6 +39,19 @@ bootstrap detector at confidence `0.45` reached F1 `0.61629`, exceeding the
 UniFace RetinaFace MNetV2 baseline F1 `0.59099` under the repository IoU/F1
 harness. The exported ONNX artifact was checked with ONNX Runtime.
 
+Follow-up detector experiments showed that beating the baseline on one metric is
+not enough. Whole-image 960 training improved val100 F1 to `0.60827` at
+confidence `0.45`, but precision remained `0.77907`. Raising the threshold to
+confidence `0.75` improved precision to `0.91367` but dropped recall to
+`0.40144` and F1 to `0.55780`. A clean teacher-only fine-tune from that
+checkpoint improved precision further, reaching `0.87950` precision at
+confidence `0.55`, but recall/F1 fell to `0.40421`/`0.55391`. This route is a
+useful precision ceiling, not the final detector route.
+
+The WIDER FACE benchmark harness now rejects unsupported non-square resize modes
+for UniFace detector baselines instead of accepting a CLI argument that the
+underlying baseline wrapper cannot honor.
+
 ### Files Modified
 
 - `scripts/prepare-widerface-detector-data.sh`
