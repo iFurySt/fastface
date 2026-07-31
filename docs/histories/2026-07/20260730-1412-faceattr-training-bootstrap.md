@@ -1,0 +1,198 @@
+## [2026-07-30 14:12] | Task: Face Attribute Training Bootstrap
+
+### Execution Context
+
+- Agent ID: `codex`
+- Base Model: `GPT-5`
+- Runtime: `Codex CLI`
+
+### User Query
+
+> Document the age/gender model training plan in the repository, prepare the GPU training environment, and start downloading approved public datasets. The model should output gender and numeric age only, with no race prediction.
+
+### Changes Overview
+
+- Area: model design, dataset planning, GPU environment setup, dataset bootstrap automation.
+- Key actions:
+  - Added the face age/gender model design doc with teacher/student training strategy.
+  - Added dataset policy, source status, and manifest requirements.
+  - Added GPU setup notes for the GPU host and scripted environment bootstrap.
+  - Added dataset download automation for FairFace, Lagenda, IMDB-clean, UTKFace, CelebA, and Adience status tracking.
+  - Added an active execution plan for the training bootstrap.
+  - Added a Python package with manifest builders, a MobileNetV3 age/gender model, and a DDP training entry point.
+  - Started an 8-GPU real training run using FairFace and UTKFace manifests.
+  - Completed a 40-epoch FairFace + UTKFace training run and exported FP32/static-INT8 ONNX models.
+  - Ran ONNX Runtime CPU benchmarks for batch sizes `1`, `8`, `32`, and `128`.
+  - Added source-sliced checkpoint evaluation.
+  - Completed a 40-epoch MobileNetV3-Small 112x112 run and benchmarked its ONNX exports.
+  - Added ONNX Runtime CPU thread-sweep benchmarking and recorded tuned large/small results.
+  - Investigated a smaller Hugging Face Lagenda mirror as the next exact-age data source; partial local cache exists but is not complete or staged.
+  - Completed a 40-epoch MobileNetV3-Large 112x112 run and benchmarked it as an accuracy/throughput middle candidate.
+  - Added teacher distillation support to the DDP trainer and completed the first MobileNetV3-Small 112x112 distillation run from the MobileNetV3-Large 112 teacher.
+  - Recorded that the first distillation configuration is not a default candidate because it reduced gender accuracy versus the non-distilled small model.
+  - Added and completed a lower-weight distillation config; recorded that it also reduced gender accuracy and did not improve FP32 throughput.
+  - Added model-card generation for completed run directories.
+  - Added Lagenda-HF download/manifest automation and a data-expanded MobileNetV3-Small 112 training config.
+  - Added dataset status reporting for staged raw images and manifest rows.
+  - Updated checkpoint evaluation to use the checkpoint's configured manifests by default, avoiding stale fixed-manifest evaluation for data-expanded runs.
+  - Completed the Lagenda-HF image mirror download and staged it on the GPU host.
+  - Completed a MobileNetV3-Small 112 Lagenda-HF training run without face cropping and recorded it as a failed data-ingestion experiment.
+  - Added manifest `bbox_face` cropping support in training, evaluation, and static INT8 calibration.
+  - Completed a second MobileNetV3-Small 112 Lagenda-HF run with `face_crop_margin: 0.2`.
+  - Exported, evaluated, model-carded, and CPU thread-swept both Lagenda-HF runs.
+  - Fixed export automation so static INT8 calibration reads checkpoint manifests and face-crop margin without relying on heredoc stdin through `conda run`.
+  - Added resumable IMDB-clean original image download/extract/manifest automation and started the real GPU-host image acquisition.
+  - Switched the active IMDB-clean download from single-connection `wget` to segmented `aria2c` resume mode after confirming the ETH source supports byte ranges.
+  - Cleaned up an old `xargs` downloader process group that still held the IMDB preparation lock, then restarted the active `aria2c` preparation task with all 10 tar files downloading concurrently.
+  - Added an IMDB-clean MobileNetV3-Small 112 training config for the next data-expanded run.
+  - Added and started a watcher that will launch the real 8-GPU IMDB-expanded training run once the IMDB manifest is generated.
+  - Added a run finalizer so completed training runs automatically get source-sliced evaluation, ONNX exports, CPU benchmarks, thread-sweep summaries, and model cards.
+  - Added an idempotent IMDB pipeline ensure script that starts the downloader or watcher only when they are missing.
+  - Added ONNX Runtime quant pre-processing and INT8 variant tuning automation.
+  - Ran real INT8 variant sweeps on the MobileNetV3-Small 112 throughput candidate and recorded that FP32 remains substantially faster for high-batch CPU throughput.
+  - Added expected-byte, percentage, and per-tar progress reporting for the segmented IMDB-clean tar download.
+  - Added IMDB tar completion checks before extraction and a minimum IMDB manifest row threshold before automatic 8-GPU training.
+  - Added a single IMDB pipeline status command for long-running download, manifest, training, and finalization checks.
+  - Added transfer-rate and ETA reporting based on the previous dataset status snapshot.
+  - Fixed the IMDB pipeline status process counters so `pgrep` queries do not count themselves.
+  - Added a long-lived IMDB pipeline monitor and idempotent start command that periodically run ensure and record status snapshots.
+  - Changed IMDB preparation and self-healing restarts to pipeline validated extraction per completed tar, reducing tail time before manifest generation.
+  - Added manifest validation tooling, atomic IMDB manifest publication, and a training watcher validation gate.
+  - Added compact IMDB-clean tar progress summaries to dataset status snapshots, including closest/least-complete tar files, total ETA, earliest per-tar ETA, and fastest/slowest active tar files.
+  - Added a shared model factory and torchvision EfficientNet-B0/ResNet18 age/gender challenger support.
+  - Added an EfficientNet-B0 128 training config and completed a real 8-GPU FairFace + UTKFace challenger run with automatic finalization.
+  - Added a generic `scripts/train-and-finalize.sh` entry point for config-driven training followed by evaluation, ONNX export, CPU benchmark, thread sweep, and model card generation.
+  - Split IMDB-specific and global age/gender training process counts in the IMDB pipeline status command.
+  - Fixed model-card backbone labels for non-MobileNetV3 model-factory runs.
+  - Added and completed a ResNet18 128 real 8-GPU FairFace + UTKFace baseline run with full finalization.
+  - Added and completed a MobileNetV3-Small 112 distillation run using EfficientNet-B0 128 as teacher, then recorded the tiny accuracy gain and throughput loss.
+  - Added and completed a MobileNetV3-Small 128 real 8-GPU FairFace + UTKFace run with full finalization, then recorded that it does not beat the MobileNetV3-Small 112 throughput default.
+  - Added ConvNeXt-Tiny backbone support and completed a real 8-GPU FairFace + UTKFace teacher/accuracy challenger run with full finalization.
+  - Recorded that ConvNeXt-Tiny 128 does not beat EfficientNet-B0 or ResNet18 on gender accuracy and is far too slow for CPU deployment.
+  - Added EfficientNetV2-S backbone support and completed a real 8-GPU FairFace + UTKFace teacher/accuracy challenger run with full finalization.
+  - Promoted EfficientNetV2-S 128 as the current public-data teacher candidate while keeping MobileNetV3-Small 112 FP32 as the CPU throughput candidate.
+  - Added and completed a MobileNetV3-Small 112 distillation run using EfficientNetV2-S 128 as teacher, then recorded that the stronger teacher reduced student gender accuracy.
+  - Added and completed two MobileNetV3-Large 128 distillation runs using EfficientNetV2-S 128 as teacher.
+  - Recorded that standard V2-S distillation was the best completed MobileNetV3-Large 128 variant at that point, while the lower-weight V2-S distillation run is not useful.
+  - Added and completed a gender-only MobileNetV3-Large 128 distillation run using EfficientNetV2-S 128 as teacher, then recorded it as the best completed Large-class gender candidate with an age-quality tradeoff.
+  - Added and completed a gender-only MobileNetV3-Small 112 distillation run using EfficientNetV2-S 128 as teacher, then recorded that it does not improve the high-throughput Small112 candidate.
+  - Fixed automatic finalization input-size handling so config-driven 112-input runs are exported and benchmarked at 112 unless explicitly overridden.
+  - Added and completed a gender-only MobileNetV3-Large 112 distillation run using EfficientNetV2-S 128 as teacher, then recorded it as a minor middle-candidate improvement that does not displace the current accuracy or throughput defaults.
+  - Added and completed a standard MobileNetV3-Large 112 distillation run using EfficientNetV2-S 128 as teacher, then recorded that it improves age but hurts the gender-first target.
+  - Added and completed a gender-priority MobileNetV3-Large 128 distillation run using EfficientNetV2-S 128 as teacher, then recorded it as the best completed MobileNetV3-Large gender candidate so far.
+  - Added Swin-T support and completed a real 8-GPU Swin-T 128 transformer challenger run, then recorded it as a negative CPU-deployment and teacher candidate.
+  - Added a `FINALIZE_THREAD_SWEEP` switch so very slow negative challengers can keep full training, evaluation, ONNX export, and default CPU benchmarks without spending hours on full thread sweeps.
+  - Added and completed an EfficientNet-B0 128 gender-priority run with supervised `gender_weight=4.0` and `age_weight=0.5`, then recorded that it is the best B0 gender variant but not the teacher or CPU throughput default.
+  - Added and started an EfficientNetV2-S 128 gender-priority teacher challenger with supervised `gender_weight=4.0` and `age_weight=0.5`.
+  - Refreshed an intermediate IMDB-clean download progress snapshot to 223.24 GB of 285.60 GB, or 78.17%, while the downloader and IMDB training watcher were still running.
+  - Added an IMDB watcher idle-training/finalization gate so the IMDB-expanded 8-GPU run waits for any active full-machine challenger or benchmark finalizer before starting.
+  - Recorded the active EfficientNetV2-S 128 gender-priority challenger as the current full-machine run.
+  - Completed IMDB-clean original image acquisition, built and validated a 285,946-row manifest, and started the real 8-GPU IMDB-expanded MobileNetV3-Small 112 training run.
+  - Completed EfficientNetV2-S 128 gender-priority training, source-sliced evaluation, ONNX export, default CPU benchmark, and model-card generation.
+  - Promoted EfficientNetV2-S 128 gender-priority as the current public-data teacher candidate based on evaluation gender balanced accuracy `0.94703`, while keeping MobileNetV3-Small 112 FP32 as the CPU throughput default.
+  - Stopped the EfficientNetV2-S 128 gender-priority full thread sweep after default CPU benchmarks so the machine could hand off to the IMDB-expanded run, and removed that run from the default `scripts/benchmark-thread-sweep.sh` list.
+  - Completed the natural-mix IMDB-expanded MobileNetV3-Small 112 run with evaluation, ONNX export, CPU benchmark, thread sweep, and model-card generation.
+  - Recorded that the natural-mix IMDB-expanded run reaches mixed gender balanced accuracy `0.96994`, but should not be promoted because FairFace source-sliced gender balanced accuracy regresses to `0.90004`.
+  - Added sample-limited dataset loading for train/validation splits so follow-up runs can cap dominant sources such as IMDB-clean during training and checkpoint selection.
+  - Added and started a source-balanced IMDB-expanded MobileNetV3-Small 112 run that caps IMDB-clean train rows at `90,000` and validation rows at `10,954`.
+  - Added an EfficientNetV2-S 128 source-balanced gender-priority teacher/challenger config and queued its watcher to run after the active Small112 source-balanced job and finalization idle.
+  - Completed the source-balanced IMDB-expanded MobileNetV3-Small 112 run with evaluation, ONNX export, CPU benchmark, thread sweep, and model-card generation.
+  - Recorded that the source-balanced Small112 run reaches full-manifest mixed gender balanced accuracy `0.96553`, but should not be promoted because FairFace source-sliced gender balanced accuracy remains only `0.89950`.
+  - Completed an IMDB-pretrained MobileNetV3-Small 112 fine-tune on FairFace + UTKFace with evaluation, ONNX export, CPU benchmark, thread sweep, and model-card generation.
+  - Recorded that the pretrain-fine-tune run reaches full-manifest mixed gender balanced accuracy `0.96784`, but should not be promoted because FairFace source-sliced gender balanced accuracy remains only `0.90024`.
+  - Confirmed the EfficientNetV2-S 128 source-balanced gender-priority watcher started active 8-GPU training after the pretrain-fine-tune finalization idled.
+  - Completed the EfficientNetV2-S 128 source-balanced IMDB gender-priority teacher/challenger with evaluation, ONNX export, default CPU benchmarks, and model-card generation.
+  - Recorded that the EfficientNetV2-S IMDB-inclusive run reaches mixed gender balanced accuracy `0.98605`, age MAE `4.84`, and source slices FairFace `0.94386`, IMDB-clean `0.99138`, and UTKFace `0.95424`.
+  - Recorded that this run is useful as an IMDB-inclusive teacher/challenger, but it does not replace the public-data FairFace-robustness teacher or the MobileNetV3-Small 112 FP32 CPU throughput default.
+  - Added and started a MobileNetV3-Small 112 source-balanced IMDB gender-distillation run that uses the completed source-balanced EfficientNetV2-S checkpoint as a low-weight gender-only teacher.
+  - Completed the MobileNetV3-Small 112 source-balanced IMDB gender-distillation run with evaluation, ONNX export, CPU benchmarks, thread sweep, and model-card generation.
+  - Recorded that the new Small112 distillation run reaches mixed gender balanced accuracy `0.96800`, improves Small-family FairFace to `0.90562`, and keeps tuned FP32 batch-128 throughput at `10,837.8` img/s.
+  - Added a MobileNetV3-Large 128 source-balanced IMDB gender-distillation config to test the next accuracy/CPU-throughput tradeoff tier against the same IMDB-inclusive EfficientNetV2-S teacher.
+  - Completed the MobileNetV3-Large 128 source-balanced IMDB gender-distillation run with evaluation, ONNX export, CPU benchmarks, thread sweep, and model-card generation.
+  - Recorded that the Large128 distillation run reaches mixed gender balanced accuracy `0.97929`, FairFace `0.92877`, IMDB-clean `0.98548`, UTKFace `0.95017`, and tuned FP32 batch-128 throughput `4,477.7` img/s.
+  - Added a fixed gender-disagreement comparison command for the current Large128 candidate, Small112 candidate, EfficientNetV2-S teacher, and public FairFace-ONNX baseline.
+  - Ran the comparison on 24,333 selected validation rows and recorded 2,343 model-disagreement rows plus focused review CSVs and a top-case contact sheet under `outputs/analysis/gender-comparison-current`.
+  - Added a manual gender-review workbook builder that embeds face-crop thumbnails, renames `image_path` to `image`, adds explicit model-vs-public prediction columns, and leaves `manual_gender` blank for human labels.
+  - Converged the default manual review to `public_vs_our_large` only, excluding internal model-only disagreements.
+  - Built the current 1,301-row public-vs-our manual review package under `outputs/analysis/manual-public-gender-review-current` and copied the workbook, CSV, and zip package to local `outputs/manual-public-gender-review-current`.
+
+### Design Intent
+
+The plan chooses `MobileNetV3-Large 128x128` as the first CPU production student and keeps heavier transformer-style models as teachers or challengers. Age is trained as a `0..100` distribution with expectation output so the product still emits one numeric age while avoiding brittle scalar-only regression. Race prediction is deliberately excluded from the product surface; race labels may only be used for permitted validation slices.
+
+### Files Modified
+
+- `docs/ARCHITECTURE.md`
+- `docs/GPU_ENVIRONMENT.md`
+- `docs/datasets.md`
+- `docs/model-runs.md`
+- `docs/design-docs/face-attribute-model.md`
+- `docs/exec-plans/active/faceattr-training-bootstrap.md`
+- `configs/train/mobilenetv3_real.yaml`
+- `configs/train/mobilenetv3_large_112_real.yaml`
+- `configs/train/mobilenetv3_large_112_distill_efficientnet_v2_s.yaml`
+- `configs/train/mobilenetv3_large_112_distill_gender_efficientnet_v2_s.yaml`
+- `configs/train/mobilenetv3_small_112_imdb_real.yaml`
+- `configs/train/mobilenetv3_small_112_imdb_source_balanced_real.yaml`
+- `configs/train/efficientnet_v2_s_128_imdb_source_balanced_gender_priority_real.yaml`
+- `configs/train/mobilenetv3_small_112_imdb_source_balanced_distill_gender_priority_efficientnet_v2_s_imdb.yaml`
+- `configs/train/mobilenetv3_large_128_imdb_source_balanced_distill_gender_priority_efficientnet_v2_s_imdb.yaml`
+- `packages/fastface/evaluation/compare_gender_models.py`
+- `packages/fastface/evaluation/build_manual_gender_review.py`
+- `scripts/build-manual-gender-review.sh`
+- `scripts/compare-gender-models.sh`
+- `configs/train/mobilenetv3_small_112_lagenda_real.yaml`
+- `configs/train/mobilenetv3_small_112_distill_large112.yaml`
+- `configs/train/mobilenetv3_small_112_distill_light_large112.yaml`
+- `configs/train/mobilenetv3_small_112_distill_efficientnet_b0.yaml`
+- `configs/train/mobilenetv3_small_112_distill_gender_efficientnet_v2_s.yaml`
+- `configs/train/mobilenetv3_small_112_distill_efficientnet_v2_s.yaml`
+- `configs/train/mobilenetv3_large_128_distill_efficientnet_v2_s.yaml`
+- `configs/train/mobilenetv3_large_128_distill_gender_efficientnet_v2_s.yaml`
+- `configs/train/mobilenetv3_large_128_distill_gender_priority_efficientnet_v2_s.yaml`
+- `configs/train/mobilenetv3_large_128_distill_light_efficientnet_v2_s.yaml`
+- `configs/train/mobilenetv3_small_128_real.yaml`
+- `configs/train/convnext_tiny_128_real.yaml`
+- `configs/train/efficientnet_v2_s_128_real.yaml`
+- `configs/train/efficientnet_v2_s_128_gender_priority_real.yaml`
+- `configs/train/efficientnet_b0_128_real.yaml`
+- `configs/train/efficientnet_b0_128_gender_priority_real.yaml`
+- `configs/train/efficientnet_v2_s_128_gender_priority_real.yaml`
+- `configs/train/resnet18_128_real.yaml`
+- `configs/train/swin_t_128_real.yaml`
+- `packages/fastface/data/build_manifest.py`
+- `packages/fastface/data/labels.py`
+- `packages/fastface/data/manifest_dataset.py`
+- `packages/fastface/data/report_dataset_status.py`
+- `packages/fastface/data/validate_manifest.py`
+- `packages/fastface/evaluation/evaluate_checkpoint.py`
+- `packages/fastface/models/age_gender_mobilenetv3.py`
+- `packages/fastface/models/age_gender_torchvision.py`
+- `packages/fastface/models/factory.py`
+- `packages/fastface/export/benchmark_onnx.py`
+- `packages/fastface/export/export_onnx.py`
+- `packages/fastface/export/generate_model_card.py`
+- `packages/fastface/export/preprocess_quant_onnx.py`
+- `packages/fastface/export/quantize_static_onnx.py`
+- `packages/fastface/export/summarize_thread_sweep.py`
+- `packages/fastface/training/train_age_gender.py`
+- `pyproject.toml`
+- `scripts/build-training-manifests.sh`
+- `scripts/benchmark-thread-sweep.sh`
+- `scripts/bootstrap-gpu-env.sh`
+- `scripts/download-public-datasets.sh`
+- `scripts/evaluate-checkpoint.sh`
+- `scripts/export-and-benchmark.sh`
+- `scripts/ensure-imdb-pipeline-running.sh`
+- `scripts/generate-model-card.sh`
+- `scripts/imdb-pipeline-status.sh`
+- `scripts/monitor-imdb-pipeline.sh`
+- `scripts/start-imdb-pipeline-monitor.sh`
+- `scripts/finalize-model-run.sh`
+- `scripts/prepare-imdb-clean-images.sh`
+- `scripts/report-dataset-status.sh`
+- `scripts/validate-imdb-manifest.sh`
+- `scripts/start-real-training.sh`
+- `scripts/tune-int8-variants.sh`
+- `scripts/train-and-finalize.sh`
+- `scripts/wait-imdb-and-start-training.sh`

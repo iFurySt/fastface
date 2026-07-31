@@ -1,0 +1,44 @@
+seed: 20260730
+
+model:
+  name: mobilenetv3_age_gender
+  variant: small
+  pretrained: false
+  dropout: 0.2
+
+data:
+  manifests:
+    - data/manifests/fairface.jsonl
+    - data/manifests/utkface.jsonl
+    - data/manifests/imdb_clean.jsonl
+  train_manifests:
+    - data/manifests/fairface.jsonl
+    - data/manifests/utkface.jsonl
+  val_manifests:
+    - data/manifests/fairface.jsonl
+    - data/manifests/utkface.jsonl
+  eval_manifests:
+    - data/manifests/fairface.jsonl
+    - data/manifests/utkface.jsonl
+    - data/manifests/imdb_clean.jsonl
+  calibration_manifests:
+    - data/manifests/fairface.jsonl
+    - data/manifests/utkface.jsonl
+    - data/manifests/imdb_clean.jsonl
+  input_size: 112
+  batch_size: 384
+  num_workers: 12
+  age_sigma: 2.0
+  face_crop_margin: 0.2
+
+loss:
+  gender_weight: 2.0
+  age_weight: 1.0
+
+train:
+  epochs: 20
+  lr: 0.0002
+  weight_decay: 0.01
+  amp: true
+  initial_checkpoint: runs/mobilenetv3_small112_imdb_facecrop_real_fairface_utkface/best.pt
+  output_dir: runs/mobilenetv3_small112_imdb_pretrain_finetune_fairface_utkface

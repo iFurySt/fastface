@@ -1,0 +1,35 @@
+seed: 20260730
+
+model:
+  name: mobilenetv3_age_gender
+  variant: small
+  pretrained: true
+  dropout: 0.2
+
+data:
+  manifests:
+    - data/manifests/fairface.jsonl
+    - data/manifests/utkface.jsonl
+  input_size: 112
+  batch_size: 512
+  num_workers: 12
+  age_sigma: 2.0
+
+loss:
+  gender_weight: 2.0
+  age_weight: 1.0
+
+distillation:
+  enabled: true
+  teacher_checkpoint: runs/efficientnet_v2_s_128_real_fairface_utkface/best.pt
+  teacher_config: runs/efficientnet_v2_s_128_real_fairface_utkface/config.resolved.yaml
+  temperature: 2.0
+  gender_weight: 0.2
+  age_weight: 0.1
+
+train:
+  epochs: 40
+  lr: 0.001
+  weight_decay: 0.01
+  amp: true
+  output_dir: runs/mobilenetv3_small112_distill_efficientnet_v2_s_fairface_utkface

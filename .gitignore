@@ -1,0 +1,65 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Logs and temp files
+*.log
+*.out
+*.err
+tmp/
+temp/
+.tmp/
+
+# Environment and local overrides
+.env
+.env.local
+.env.*.local
+
+# Dependency caches and common build output
+node_modules/
+.pnpm-store/
+.npm/
+.yarn/
+.turbo/
+.next/
+dist/
+build/
+coverage/
+target/
+bin/
+obj/
+.cache/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Terraform and infra
+.terraform/
+*.tfstate
+*.tfstate.*
+
+# Misc generated artifacts
+*.swp
+*.swo
+/outputs/
+/runs/
+/models/
+/data/
+/third_party/
+/logs/
+
+# Model/release artifacts live on Hugging Face, not GitHub
+*.pt
+*.pth
+*.onnx
+*.safetensors
+*.ckpt
+*.zip
+*.tar
+*.tar.gz
+*.aria2
