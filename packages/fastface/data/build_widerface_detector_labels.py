@@ -20,9 +20,12 @@ def convert_widerface_bbx_to_retinaface_label(source_path: Path, output_path: Pa
             face_count = int(lines[idx].strip())
             idx += 1
             faces: list[list[float]] = []
-            for _ in range(face_count):
+            annotation_rows = face_count if face_count > 0 else 1
+            for _ in range(annotation_rows):
                 parts = [float(value) for value in lines[idx].strip().split()]
                 idx += 1
+                if face_count == 0:
+                    continue
                 x, y, width, height = parts[:4]
                 if width <= 1 or height <= 1:
                     continue
