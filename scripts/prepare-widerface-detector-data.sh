@@ -39,6 +39,10 @@ if [[ "${DOWNLOAD_RETINAFACE_GT}" == "1" && ! -s "${RETINAFACE_GT_ZIP}" ]]; then
   download_file "${RETINAFACE_GT_URL}" "${RETINAFACE_GT_ZIP}"
 fi
 
+if [[ -s "${WIDERFACE_DIR}/wider_face_split.zip" && ! -d "${WIDERFACE_DIR}/wider_face_split" ]]; then
+  unzip -q "${WIDERFACE_DIR}/wider_face_split.zip" -d "${WIDERFACE_DIR}"
+fi
+
 if [[ -s "${WIDERFACE_DIR}/WIDER_train.zip" && ! -d "${WIDERFACE_DIR}/train/images" ]]; then
   tmp_dir="${WIDERFACE_DIR}/_extract_train"
   rm -rf "${tmp_dir}"
@@ -52,6 +56,23 @@ if [[ -s "${WIDERFACE_DIR}/WIDER_train.zip" && ! -d "${WIDERFACE_DIR}/train/imag
   else
     echo "Could not find WIDER train images after extraction" >&2
     exit 2
+  fi
+  rm -rf "${tmp_dir}"
+fi
+
+if [[ -s "${WIDERFACE_DIR}/WIDER_val.zip" && ! -d "${WIDERFACE_DIR}/val/images" ]]; then
+  tmp_dir="${WIDERFACE_DIR}/_extract_val"
+  rm -rf "${tmp_dir}"
+  mkdir -p "${tmp_dir}"
+  unzip -q "${WIDERFACE_DIR}/WIDER_val.zip" -d "${tmp_dir}"
+  mkdir -p "${WIDERFACE_DIR}/val"
+  if [[ -d "${tmp_dir}/WIDER_val/images" ]]; then
+    mv "${tmp_dir}/WIDER_val/images" "${WIDERFACE_DIR}/val/images"
+  elif [[ -d "${tmp_dir}/images" ]]; then
+    mv "${tmp_dir}/images" "${WIDERFACE_DIR}/val/images"
+  else
+    echo "Could not find WIDER val images after extraction" >&2
+    exit 8
   fi
   rm -rf "${tmp_dir}"
 fi
