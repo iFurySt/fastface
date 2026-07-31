@@ -80,6 +80,17 @@ metrics but shifted too far toward precision: confidence `0.45` reached
 precision `0.9049`, recall `0.4028`, and F1 `0.5575`. This rules out a simple
 full+clean weighted replay as the final path.
 
+Threshold calibration on the whole-image 960 teacher-landmark ONNX candidate
+identified the current `fastfacedetector` release candidate: max-side 1280,
+confidence `0.65`, NMS `0.3`, and pre-NMS topK `1000`. On the full WIDER FACE
+validation split it reached precision `0.87832`, recall `0.48082`, F1 `0.62144`,
+and `0.02088` seconds/image, beating the UniFace RetinaFace MNetV2 baseline on
+the measured bbox and latency gates. Alignment val50 versus UniFace remained in
+the teacher-landmark range with mean normalized landmark error `0.0908`,
+aligned-crop MAE `0.0896`, mean FastFace age difference `4.2993`, and gender
+agreement `0.8740`. End-to-end owned-detector pipeline smoke tests passed for
+both `landmark_5pt` face crops and no-face rejection.
+
 ### Files Modified
 
 - `scripts/prepare-widerface-detector-data.sh`

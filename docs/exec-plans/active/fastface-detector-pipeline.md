@@ -290,3 +290,19 @@ Validation notes:
   normalized landmark error `0.0882` and aligned-crop MAE `0.0891`. Consequence:
   clean-label weighting must be weaker or replaced by score calibration; this
   mixed-clean run is not a final candidate.
+- 2026-07-31: Threshold calibration on the whole-image 960 teacher-landmark ONNX
+  candidate found a configuration that beats UniFace RetinaFace MNetV2 on the
+  measured bbox and latency gates while retaining the better teacher-landmark
+  alignment profile. Recommended candidate: whole-image 960 ONNX, max-side 1280,
+  confidence `0.65`, NMS `0.3`, pre-NMS topK `1000`. Evidence on full WIDER FACE
+  validation: precision `0.87832`, recall `0.48082`, F1 `0.62144`, and `0.02088`
+  seconds/image versus UniFace RetinaFace MNetV2 precision `0.87753`, recall
+  `0.44552`, F1 `0.59099`, and `0.02699` seconds/image. Alignment val50 versus
+  UniFace: matched faces `603`, match-rate `0.9000`, mean normalized landmark
+  error `0.0908`, aligned-crop MAE `0.0896`, mean FastFace age difference
+  `4.2993`, and gender agreement `0.8740`. End-to-end pipeline smoke tests with
+  this detector returned `crop_mode: "landmark_5pt"` on a face image and
+  `status: "no_face"` on a generated plain image. Consequence: this is the
+  current release candidate for `fastfacedetector`; remaining release work is
+  artifact packaging/model-card documentation rather than further architecture
+  search.

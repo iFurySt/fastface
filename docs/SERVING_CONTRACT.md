@@ -122,7 +122,7 @@ bash scripts/predict-image.sh \
   --owned-detector-onnx models/fastfacedetector/fastfacedetector.onnx \
   --detector-input-size 1280 \
   --detector-resize-mode max-side \
-  --detector-conf 0.55 \
+  --detector-conf 0.65 \
   --detector-nms 0.3 \
   --detector-pre-nms-topk 1000
 ```
