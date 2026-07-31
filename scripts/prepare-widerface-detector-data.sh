@@ -85,58 +85,10 @@ if [[ ! -s "${WIDERFACE_DIR}/train/label.txt" && "${ALLOW_PSEUDO_LANDMARKS}" == 
     echo "Could not find wider_face_train_bbx_gt.txt inside ${WIDERFACE_DIR}/wider_face_split.zip" >&2
     exit 7
   fi
-  "${CONDA_BIN}" run -n "${ENV_NAME}" python - "${bbx_file}" "${WIDERFACE_DIR}/train/label.txt" <<'PY'
-from __future__ import annotations
-
-from pathlib import Path
-import sys
-
-source = Path(sys.argv[1])
-output = Path(sys.argv[2])
-lines = source.read_text(encoding="utf-8").splitlines()
-output.parent.mkdir(parents=True, exist_ok=True)
-
-idx = 0
-written_images = 0
-written_faces = 0
-with output.open("w", encoding="utf-8") as handle:
-    while idx < len(lines):
-        image_name = lines[idx].strip()
-        idx += 1
-        if not image_name:
-            continue
-        face_count = int(lines[idx].strip())
-        idx += 1
-        faces = []
-        for _ in range(face_count):
-            parts = [float(value) for value in lines[idx].strip().split()]
-            idx += 1
-            x, y, w, h = parts[:4]
-            if w <= 1 or h <= 1:
-                continue
-            # Bootstrap labels when true RetinaFace landmarks are unavailable.
-            # They are stable face-box anchors, not human-labeled landmarks.
-            points = [
-                (x + 0.35 * w, y + 0.40 * h),
-                (x + 0.65 * w, y + 0.40 * h),
-                (x + 0.50 * w, y + 0.55 * h),
-                (x + 0.38 * w, y + 0.75 * h),
-                (x + 0.62 * w, y + 0.75 * h),
-            ]
-            row = [x, y, w, h]
-            for px, py in points:
-                row.extend([px, py, 0.0])
-            faces.append(row)
-        if not faces:
-            continue
-        handle.write(f"# {image_name}\n")
-        for row in faces:
-            handle.write(" ".join(f"{value:.3f}" for value in row) + "\n")
-            written_faces += 1
-        written_images += 1
-
-print(f"wrote {written_images} images and {written_faces} pseudo-landmark faces to {output}")
-PY
+  PYTHONPATH="${PROJECT_DIR}/packages${PYTHONPATH:+:${PYTHONPATH}}" \
+    "${CONDA_BIN}" run -n "${ENV_NAME}" python -m fastface.data.build_widerface_detector_labels \
+      --source "${bbx_file}" \
+      --output "${WIDERFACE_DIR}/train/label.txt"
   rm -rf "${tmp_dir}"
 fi
 
