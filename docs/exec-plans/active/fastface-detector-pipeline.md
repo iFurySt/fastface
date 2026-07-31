@@ -222,3 +222,15 @@ Validation notes:
   latency. Fixed-640 inference gets closer to UniFace latency but loses too much
   recall, so the latency gap is a training-scale distribution issue rather than
   only a postprocessing issue.
+- 2026-07-31: Added a max-side resize benchmark path. Max-side 1280 keeps
+  owned-detector precision, recall, and F1 above UniFace RetinaFace MNetV2 but
+  remains slower. Evidence on full WIDER FACE validation: owned max-side 1280
+  reached precision `0.89052`, recall `0.45003`, F1 `0.59790`, and `0.04573`
+  seconds/image; UniFace RetinaFace MNetV2 reached precision `0.87753`, recall
+  `0.44552`, F1 `0.59099`, and `0.02699` seconds/image.
+- 2026-07-31: Fixed-640-friendly training improves fixed-640 recall/F1 but has
+  not reached the full target. Evidence on val100: epoch 40 reached F1 `0.59997`
+  and recall `0.50138` at confidence `0.45`, but precision was only `0.74680`;
+  higher confidence improves precision but lowers F1/recall. Clean teacher-only
+  fixed-640 training started as a high-precision follow-up and reached val100 F1
+  `0.52491` at epoch 13.
