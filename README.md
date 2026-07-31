@@ -5,7 +5,8 @@ for high-throughput CPU inference.
 
 The product surface is intentionally narrow:
 
-- Input: an aligned face crop, or an image row with a face bounding box.
+- Input: an aligned face crop, or a raw image routed through the explicit
+  detector + FastFace pipeline.
 - Output: gender and one numeric age value.
 - Out of scope: race prediction.
 
@@ -24,12 +25,30 @@ GitHub on Hugging Face: <https://huggingface.co/iFurySt/fastface>.
 See [`docs/model-runs.md`](docs/model-runs.md) for the full run matrix,
 source-sliced metrics, ONNX sizes, and CPU benchmarks.
 
+## Full-Image Inference
+
+The released FastFace attribute models do not detect faces. For raw images, use
+the repository pipeline so no-face handling and face alignment are explicit:
+
+```sh
+bash scripts/predict-image.sh \
+  --image input.jpg \
+  --model models/fastface-large-128/model_fp32.onnx \
+  --detector retinaface \
+  --detector-model retinaface_mnet_v2
+```
+
+Current detector backends are optional UniFace baselines. The intended owned
+runtime shape is `fastfacedetector + fastface`; see
+[`docs/SERVING_CONTRACT.md`](docs/SERVING_CONTRACT.md).
+
 ## Repository Layout
 
 ```text
 configs/train/                 Training configs used for phase-1 runs
 packages/fastface/data/         Manifest builders and dataset loading
 packages/fastface/models/       MobileNetV3 and torchvision age/gender models
+packages/fastface/pipeline/     Full-image detector + FastFace runtime
 packages/fastface/training/     DDP training entry point
 packages/fastface/export/       ONNX export, quantization, benchmarks, model cards
 packages/fastface/evaluation/   Evaluation, model comparison, manual review tooling
@@ -44,6 +63,7 @@ Read these first:
 - [`docs/TECHNICAL_REPORT.md`](docs/TECHNICAL_REPORT.md): phase-1 technical report.
 - [`docs/DATA_PROVENANCE.md`](docs/DATA_PROVENANCE.md): datasets, access class, labels, and staging.
 - [`docs/MODEL_RELEASE.md`](docs/MODEL_RELEASE.md): Hugging Face artifact layout and release checklist.
+- [`docs/SERVING_CONTRACT.md`](docs/SERVING_CONTRACT.md): crop-mode and full-image inference contract.
 - [`docs/GPU_ENVIRONMENT.md`](docs/GPU_ENVIRONMENT.md): GPU host setup and commands.
 - [`docs/design-docs/face-attribute-model.md`](docs/design-docs/face-attribute-model.md): model design.
 

@@ -1,0 +1,128 @@
+# FastFace Detector And Full-Image Pipeline
+
+## Goal
+
+Provide an end-to-end FastFace image pipeline that accepts a raw image, rejects
+images where no face is detected, and returns gender plus numeric age for each
+accepted face. The long-term model shape is a two-stage pipeline:
+`fastfacedetector` for face detection and alignment metadata, followed by
+`fastface` for age/gender inference.
+
+## Scope
+
+- In scope:
+  - Add a repository-native full-image prediction CLI.
+  - Keep the current FastFace ONNX age/gender model as a crop-only attribute
+    model.
+  - Add a pluggable detector interface with UniFace detector backends as the
+    first baseline.
+  - Document the serving contract, detector output schema, and detector training
+    direction.
+- Out of scope:
+  - Training `fastfacedetector` in this first slice.
+  - Publishing detector weights in the phase-1 Hugging Face release.
+  - Adding race prediction or FairFace attribute outputs.
+
+## Context
+
+- Relevant docs:
+  - `docs/ARCHITECTURE.md`
+  - `docs/TECHNICAL_REPORT.md`
+  - `docs/MODEL_RELEASE.md`
+  - `docs/GPU_ENVIRONMENT.md`
+- Relevant code paths:
+  - `packages/fastface/export/export_onnx.py`
+  - `packages/fastface/data/manifest_dataset.py`
+  - `packages/fastface/pipeline/`
+  - `scripts/predict-image.sh`
+- Constraints:
+  - FastFace product output remains gender and numeric age only.
+  - Raw detector data, checkpoints, and ONNX binaries must not be committed.
+  - The detector dependency must remain optional until FastFace owns a detector
+    model.
+
+## Risks
+
+- Risk: The current FastFace training path used bbox crops for some datasets,
+  while production raw-image inference may use landmark alignment.
+- Mitigation: Treat UniFace detector alignment as a baseline, then compare bbox
+  crop versus landmark alignment on validation and manual-review samples before
+  freezing the detector contract.
+
+- Risk: Third-party detector code or weights could complicate release terms.
+- Mitigation: Keep UniFace as an optional baseline backend and train/release
+  `fastfacedetector` separately before making the full-image pipeline a fully
+  self-contained release.
+
+- Risk: No-face and multi-face cases can be ambiguous for product consumers.
+- Mitigation: Return explicit JSON statuses and detected-face counts instead of
+  silently resizing full scenes into the attribute model.
+
+## Milestones
+
+1. Implement a full-image baseline CLI with optional UniFace detector backends.
+2. Document the serving contract and detector training plan.
+3. Benchmark UniFace detector baselines against YuNet and current manifest bbox
+   crops.
+4. Train and export `fastfacedetector` on the GPU host.
+5. Replace or complement the UniFace baseline with the owned detector backend.
+
+## Validation
+
+- Commands:
+  - `make check`
+  - `PYTHONPATH=packages python -m fastface.pipeline.predict_image --help`
+  - `PYTHONPATH=packages python -m compileall -q packages`
+- Manual checks:
+  - Run the pipeline on one no-face image and one face image after model
+    artifacts are available locally.
+  - Compare output status, bbox, confidence, gender probabilities, and age.
+- Observability checks:
+  - JSON output must include detector backend, detector score, crop mode,
+    FastFace model path, input size, and per-face predictions.
+
+## Progress Log
+
+- [x] Confirmed FastFace currently resizes crops and only consumes existing
+  manifest `bbox_face`; it does not run automatic detection.
+- [x] Confirmed `fairface-onnx` demo uses UniFace RetinaFace plus 5-point
+  alignment, while the FairFace attribute model itself does not detect faces.
+- [x] Reviewed UniFace detector options and licensing notes.
+- [x] Implement the baseline full-image pipeline.
+- [x] Document the detector training path and GPU workflow.
+- [x] Run local validation.
+
+Validation notes:
+
+- `PYTHONPATH=packages python -m fastface.pipeline.predict_image --help`
+  passed.
+- `bash scripts/predict-image.sh --help` passed.
+- `PYTHONPATH=packages python -m compileall -q packages` passed.
+- `bash -n scripts/*.sh` passed.
+- `make check` passed.
+- Created a local pipeline test environment with `python -m pip install
+  ".[pipeline]"`.
+- `retinaface_mnet_v2` no-face smoke test on a generated plain image returned
+  `status: no_face` and `face_count: 0`.
+- `retinaface_mnet_v2` full-image smoke test on a local Lagenda sample returned
+  `status: ok`, `face_count: 3`, and `crop_mode: landmark_5pt` for every face.
+- `scrfd_500m` full-image smoke test on the same sample with `--max-faces 1`
+  returned `status: ok`, `face_count: 1`, and `crop_mode: landmark_5pt`.
+- JSON assertions passed for status, face count, probability ranges, crop mode,
+  and age bounds. Test outputs are under ignored `outputs/pipeline-test/`.
+
+## Decision Log
+
+- 2026-07-31: Keep FastFace as a crop-only attribute model and add a separate
+  detector stage. Rationale: the product model should stay focused on age/gender
+  and avoid silently treating full-scene images as aligned faces. Consequence:
+  full-image inference is a pipeline concern.
+- 2026-07-31: Use UniFace RetinaFace/SCRFD as optional baseline detector
+  backends before training `fastfacedetector`. Rationale: this gives immediate
+  end-to-end behavior and a comparison target. Consequence: UniFace remains an
+  optional dependency, not part of the core model contract.
+- 2026-07-31: Prefer future SCRFD-like or RetinaFace-MobileNet-like detector
+  training over reproducing YuNet blindly. Rationale: the detector must provide
+  robust bbox plus 5-point landmarks for alignment; YuNet is a lightweight
+  baseline, not the accuracy ceiling. Consequence: YuNet remains a baseline in
+  evaluation, not the default architecture choice.

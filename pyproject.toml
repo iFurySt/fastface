@@ -22,6 +22,12 @@ dependencies = [
   "openpyxl",
 ]
 
+[project.optional-dependencies]
+pipeline = [
+  "opencv-python>=4.5.0",
+  "uniface[cpu]>=3.7.1",
+]
+
 [tool.setuptools]
 package-dir = {"" = "packages"}
 
