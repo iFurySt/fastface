@@ -197,6 +197,7 @@ class OwnedRetinaFaceOnnxDetector:
         nms_threshold: float,
         pre_nms_topk: int,
         post_nms_topk: int,
+        input_size: int | None,
     ) -> None:
         self.repo_path = repo_path
         self.model_path = model_path
@@ -205,6 +206,7 @@ class OwnedRetinaFaceOnnxDetector:
         self.nms_threshold = nms_threshold
         self.pre_nms_topk = pre_nms_topk
         self.post_nms_topk = post_nms_topk
+        self.input_size = input_size
         self.name = f"owned-retinaface-onnx:{network}:{model_path.name}"
 
         sys.path.insert(0, str(repo_path))
@@ -225,17 +227,25 @@ class OwnedRetinaFaceOnnxDetector:
         self.output_names = [output.name for output in self.session.get_outputs()]
 
     def detect(self, image_bgr: np.ndarray) -> np.ndarray:
-        image = np.float32(image_bgr)
+        original_height, original_width = image_bgr.shape[:2]
+        if self.input_size is not None and self.input_size > 0:
+            image, resize_factor = resize_image_to_square(image_bgr, self.input_size)
+        else:
+            image = image_bgr
+            resize_factor = 1.0
+        height, width = image.shape[:2]
+        image = np.float32(image)
         image -= (104, 117, 123)
         image = image.transpose(2, 0, 1)[np.newaxis].astype(np.float32)
-        height, width = image_bgr.shape[:2]
         outputs = self.session.run(self.output_names, {self.input_name: image})
         loc = torch.from_numpy(np.asarray(outputs[0]).squeeze(0))
         conf = np.asarray(outputs[1]).squeeze(0)
         priors = self.PriorBox(self.cfg, image_size=(height, width)).generate_anchors()
         boxes = self.decode(loc, priors, self.cfg["variance"])
         bbox_scale = torch.tensor([width, height] * 2)
-        boxes = (boxes * bbox_scale).numpy()
+        boxes = (boxes * bbox_scale / resize_factor).numpy()
+        boxes[:, 0::2] = np.clip(boxes[:, 0::2], 0, original_width)
+        boxes[:, 1::2] = np.clip(boxes[:, 1::2], 0, original_height)
         scores = conf[:, 1]
         inds = scores > self.confidence_threshold
         boxes = boxes[inds]
@@ -247,6 +257,19 @@ class OwnedRetinaFaceOnnxDetector:
         keep = self.nms(detections, self.nms_threshold)
         detections = detections[keep][: self.post_nms_topk]
         return detections[:, :4].astype(np.float32)
+
+
+def resize_image_to_square(image_bgr: np.ndarray, input_size: int) -> tuple[np.ndarray, float]:
+    height, width = image_bgr.shape[:2]
+    resize_factor = input_size / max(height, width)
+    resized = cv2.resize(
+        image_bgr,
+        (int(round(width * resize_factor)), int(round(height * resize_factor))),
+        interpolation=cv2.INTER_LINEAR,
+    )
+    canvas = np.zeros((input_size, input_size, 3), dtype=image_bgr.dtype)
+    canvas[: resized.shape[0], : resized.shape[1]] = resized
+    return canvas, resize_factor
 
 
 def evaluate_detector(
@@ -348,6 +371,7 @@ def main() -> None:
             nms_threshold=args.detector_nms,
             pre_nms_topk=args.pre_nms_topk,
             post_nms_topk=args.post_nms_topk,
+            input_size=args.detector_input_size,
         )
     else:
         detector = UnifaceDetector(
