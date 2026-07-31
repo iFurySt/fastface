@@ -135,6 +135,12 @@ Expected non-Git artifacts:
 - [ ] Stage WIDER FACE images and RetinaFace label data on the GPU host.
 - [ ] Start the first `fastfacedetector` RetinaFace-MobileNetV2 bootstrap
   training run.
+- [x] Stage WIDER FACE train/val images and split annotations on the GPU host.
+- [x] Train the first bootstrap owned detector using RetinaFace MobileNetV1
+  0.50 and WIDER FACE bbox-derived pseudo landmarks.
+- [x] Benchmark the owned detector against UniFace RetinaFace/SCRFD on WIDER
+  FACE validation boxes.
+- [x] Export the owned detector to ONNX and verify ONNX Runtime can load it.
 
 Validation notes:
 
@@ -179,3 +185,11 @@ Validation notes:
   annotations are easy to stage and let us train an owned no-face/bbox detector
   while the 5-point landmark archive is blocked. Consequence: bootstrap weights
   must not be treated as the final alignment detector.
+- 2026-07-31: The first bootstrap detector exceeded the UniFace RetinaFace
+  baseline on full WIDER FACE validation using the repository IoU/F1 harness.
+  Evidence: owned RetinaFace MobileNetV1 0.50 at confidence `0.45` reached
+  precision `0.81871`, recall `0.49412`, and F1 `0.61629` over 3,226 validation
+  images; UniFace RetinaFace MNetV2 at confidence `0.5` reached precision
+  `0.87753`, recall `0.44552`, and F1 `0.59099` on the same split. Consequence:
+  the bootstrap detector satisfies the current bbox-detection target, while
+  real landmark labels remain a future alignment-quality improvement.
