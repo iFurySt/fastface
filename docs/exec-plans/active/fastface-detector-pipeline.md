@@ -67,6 +67,41 @@ accepted face. The long-term model shape is a two-stage pipeline:
 4. Train and export `fastfacedetector` on the GPU host.
 5. Replace or complement the UniFace baseline with the owned detector backend.
 
+## Owned Detector Training Slice
+
+The first owned detector slice uses a RetinaFace-MobileNetV2 training backend
+because it has a direct WIDER FACE + 5-point-landmark PyTorch training path and
+MIT-licensed reference code. SCRFD remains the preferred architecture family for
+later optimization, but its original training stack has higher setup cost.
+
+Training data contract:
+
+- `data/raw/widerface/train/images/`
+- `data/raw/widerface/train/label.txt`
+
+The `label.txt` file must include face boxes and five landmarks in the
+RetinaFace format. Raw WIDER FACE detection boxes alone are insufficient for
+the alignment contract.
+
+Training entry points:
+
+- `scripts/prepare-widerface-detector-data.sh`
+- `scripts/start-detector-training.sh`
+
+Default first run:
+
+```sh
+NETWORK=mobilenetv2 \
+RUN_NAME=fastfacedetector_retinaface_mobilenetv2_widerface \
+bash scripts/start-detector-training.sh
+```
+
+Expected non-Git artifacts:
+
+- `runs/fastfacedetector_retinaface_mobilenetv2_widerface/weights/`
+- `runs/fastfacedetector_retinaface_mobilenetv2_widerface/exports/`
+- `runs/fastfacedetector_retinaface_mobilenetv2_widerface/logs/`
+
 ## Validation
 
 - Commands:
@@ -91,6 +126,9 @@ accepted face. The long-term model shape is a two-stage pipeline:
 - [x] Implement the baseline full-image pipeline.
 - [x] Document the detector training path and GPU workflow.
 - [x] Run local validation.
+- [x] Add detector data preparation and RetinaFace training wrapper scripts.
+- [ ] Stage WIDER FACE images and RetinaFace landmark labels on the GPU host.
+- [ ] Start the first `fastfacedetector` RetinaFace-MobileNetV2 training run.
 
 Validation notes:
 
@@ -126,3 +164,7 @@ Validation notes:
   robust bbox plus 5-point landmarks for alignment; YuNet is a lightweight
   baseline, not the accuracy ceiling. Consequence: YuNet remains a baseline in
   evaluation, not the default architecture choice.
+- 2026-07-31: Use RetinaFace-MobileNetV2 as the first owned detector training
+  slice. Rationale: it has a direct WIDER FACE + 5-point-landmark PyTorch
+  training path with MIT reference code. Consequence: SCRFD remains a later
+  architecture target after the detector data and pipeline contract are proven.
