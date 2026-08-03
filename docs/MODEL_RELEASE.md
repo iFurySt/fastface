@@ -30,6 +30,12 @@ Latest Hugging Face license-sync revision:
 https://huggingface.co/iFurySt/fastface/commit/cbc06fb5aada3d286a6fad1785761a5b63450d1b
 ```
 
+Latest Hugging Face detector revision:
+
+```text
+https://huggingface.co/iFurySt/fastface/commit/15240f03bb257385305e5985e04e6d2477a242fa
+```
+
 Source repository:
 
 ```text

@@ -95,6 +95,12 @@ The Hugging Face staging script now supports a detector variant so the ONNX
 model, external ONNX data file, benchmark JSON files, run metadata, and detector
 model card can be staged without committing large binaries to GitHub.
 
+The detector release candidate was uploaded to Hugging Face at revision
+`15240f03bb257385305e5985e04e6d2477a242fa`. Verification downloaded the release
+manifest, detector model card, bbox benchmark, alignment benchmark, ONNX file,
+and external ONNX data file. The manifest contains 40 files and includes the
+detector variant under `models/fastfacedetector-retinaface-mnetv1-960/`.
+
 ### Files Modified
 
 - `scripts/prepare-widerface-detector-data.sh`
