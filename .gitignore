@@ -35,7 +35,9 @@ obj/
 # Python
 __pycache__/
 *.pyc
+*.egg-info/
 .venv/
+.venv*/
 venv/
 
 # Terraform and infra

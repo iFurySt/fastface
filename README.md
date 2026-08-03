@@ -64,6 +64,7 @@ Read these first:
 - [`docs/DATA_PROVENANCE.md`](docs/DATA_PROVENANCE.md): datasets, access class, labels, and staging.
 - [`docs/MODEL_RELEASE.md`](docs/MODEL_RELEASE.md): Hugging Face artifact layout and release checklist.
 - [`docs/SERVING_CONTRACT.md`](docs/SERVING_CONTRACT.md): crop-mode and full-image inference contract.
+- [`docs/AVATAR_LABELING.md`](docs/AVATAR_LABELING.md): local avatar pseudo-labeling workflow.
 - [`docs/GPU_ENVIRONMENT.md`](docs/GPU_ENVIRONMENT.md): GPU host setup and commands.
 - [`docs/design-docs/face-attribute-model.md`](docs/design-docs/face-attribute-model.md): model design.
 
